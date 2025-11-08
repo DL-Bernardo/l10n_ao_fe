@@ -13,6 +13,7 @@ Compatível com o ambiente de homologação 2025.
     'data': [
         'security/ir.model.access.csv',
         'data/ir_config_parameter.xml',
+        'data/ir_cron.xml',
         'views/account_move_views.xml',
         'views/fe_queue_views.xml',
     ],

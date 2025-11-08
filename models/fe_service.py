@@ -20,22 +20,17 @@ class FEDeviceService(models.AbstractModel):
             'username': ICP.get_param('fe.username'),
             'password': ICP.get_param('fe.password'),
             'base_url': ICP.get_param('fe.base_url', 'https://sifphml.minfin.gov.ao/sigt/fe/v1'),
-            'private_key_path': ICP.get_param('fe.private_key_path'),
+            'private_key': ICP.get_param('fe.private_key'),
             'product_id': ICP.get_param('fe.product_id'),
             'product_version': ICP.get_param('fe.product_version'),
             'software_validation_number': ICP.get_param('fe.software_validation_number'),
         }
 
-    def _read_private_key(self):
-        conf = self._get_conf()
-        path = conf.get('private_key_path')
-        if not path:
-            raise ValueError('fe.private_key_path não configurado')
-        with open(path, 'r') as f:
-            return f.read()
-
     def sign_object_rs256(self, obj: dict) -> str:
-        private_key = self._read_private_key()
+        conf = self._get_conf()
+        private_key = conf.get('private_key')
+        if not private_key:
+            raise ValueError('A chave privada (fe.private_key) não está configurada!')
         payload = json.dumps(obj, separators=(',', ':'), ensure_ascii=False)
         return jws.sign(payload, private_key, algorithm='RS256')
 
@@ -67,38 +62,73 @@ class FEDeviceService(models.AbstractModel):
         conf = self._get_conf()
         url = conf['base_url'].rstrip('/') + '/registarFactura'
 
+        software_info_detail = self.build_software_info()
+        software_info = {
+            'softwareInfoDetail': software_info_detail,
+            'jwsSoftwareSignature': self.sign_object_rs256(software_info_detail)
+        }
+
         payload = {
             'schemaVersion': '1.0',
             'submissionGUID': str(uuid.uuid4()),
             'taxRegistrationNumber': company.vat or '',
             'submissionTimeStamp': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
-            'softwareInfo': {'softwareInfoDetail': self.build_software_info()},
+            'softwareInfo': software_info,
             'numberOfEntries': str(len(documents)),
             'documents': documents,
         }
-
-        payload['softwareInfo']['jwsSoftwareSignature'] = self.sign_object_rs256(payload['softwareInfo'])
 
         try:
             resp = requests.post(
                 url, json=payload,
                 auth=(conf['username'], conf['password']),
-                headers={'Accept': 'application/json'},
+                headers={'Accept': 'application/json', 'Content-Type': 'application/json'},
                 timeout=60
             )
             return resp.status_code, resp.json()
+        except requests.exceptions.JSONDecodeError:
+            return resp.status_code, {'error': resp.text}
         except Exception as e:
             _logger.exception("Erro ao comunicar com FE: %s", e)
             return 500, {'error': str(e)}
 
-    def obter_estado(self, request_id):
+    def obter_estado(self, request_id, company):
         conf = self._get_conf()
         url = conf['base_url'].rstrip('/') + '/obterEstado'
-        data = {'requestId': request_id}
+
+        software_info_detail = self.build_software_info()
+        software_info = {
+            'softwareInfoDetail': software_info_detail,
+            'jwsSoftwareSignature': self.sign_object_rs256(software_info_detail)
+        }
+
+        # Assinatura específica para este pedido
+        signature_payload = {
+            'taxRegistrationNumber': company.vat or '',
+            'requestID': request_id,
+        }
+        jws_signature = self.sign_object_rs256(signature_payload)
+
+        payload = {
+            "schemaVersion": "1.0",
+            "submissionGUID": str(uuid.uuid4()),
+            "taxRegistrationNumber": company.vat or '',
+            "submissionTimeStamp": datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
+            "softwareInfo": software_info,
+            "requestID": request_id,
+            "jwsSignature": jws_signature
+        }
+
         try:
-            resp = requests.post(url, json=data, auth=(conf['username'], conf['password']),
-                                 headers={'Accept': 'application/json'}, timeout=30)
+            resp = requests.post(
+                url, json=payload,
+                auth=(conf['username'], conf['password']),
+                headers={'Accept': 'application/json', 'Content-Type': 'application/json'},
+                timeout=30
+            )
             return resp.status_code, resp.json()
+        except requests.exceptions.JSONDecodeError:
+            return resp.status_code, {'error': resp.text}
         except Exception as e:
             _logger.exception("Erro ao obter estado: %s", e)
             return 500, {'error': str(e)}

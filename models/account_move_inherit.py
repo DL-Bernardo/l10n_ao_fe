@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # -*- coding: utf-8 -*-
-from odoo import models, fields, api
+from odoo import models, fields, api, _
 from odoo.modules.module import get_module_resource
 from datetime import datetime
 import qrcode
@@ -9,6 +9,7 @@ from io import BytesIO
 import base64
 from PIL import Image
 import os
+from odoo.exceptions import UserError
 
 
 class AccountMoveInherit(models.Model):
@@ -42,27 +43,28 @@ class AccountMoveInherit(models.Model):
         pass
 
     def _get_document_number_for_fe(self):
-        """Constructs the document number based on the selected series."""
+        """Constructs the document number based on the selected series or falls back to the invoice name."""
         self.ensure_one()
         if not self.l10n_ao_fe_serie_id or not self.l10n_ao_fe_serie_id.sequence_id:
-            raise UserError(_("A fatura não tem uma série de faturação eletrónica associada ou a série não tem uma sequência Odoo."))
+            # Fallback for testing without a series
+            return self.name
         
         sequence = self.l10n_ao_fe_serie_id.sequence_id
         return f"{sequence.prefix}{self.name.split(' ')[-1]}"
 
     def action_post(self):
         """Assigns the sequence number upon validation."""
-        for move in self:
-            if move.l10n_ao_fe_serie_id and move.state == 'draft':
-                sequence = move.l10n_ao_fe_serie_id.sequence_id
-                move.name = sequence.next_by_id()
+        # for move in self:
+        #     if move.l10n_ao_fe_serie_id and move.state == 'draft':
+        #         sequence = move.l10n_ao_fe_serie_id.sequence_id
+        #         move.name = sequence.next_by_id()
         return super(AccountMoveInherit, self).action_post()
 
     def action_send_fe(self):
         service = self.env['l10n_ao.fe.service']
         for inv in self:
-            if not inv.l10n_ao_fe_serie_id:
-                raise UserError(_("Por favor, selecione uma Série de Faturação Eletrónica para este documento."))
+            # if not inv.l10n_ao_fe_serie_id:
+            #     raise UserError(_("Por favor, selecione uma Série de Faturação Eletrónica para este documento."))
 
             # 1. Construir as linhas da fatura
             lines = []
@@ -103,11 +105,12 @@ class AccountMoveInherit(models.Model):
 
             # 3. Construir o payload completo do documento
             document_no = inv._get_document_number_for_fe()
+            document_type = inv.l10n_ao_fe_document_class_id.code if inv.l10n_ao_fe_document_class_id else 'FT'
             document = {
                 'documentNo': document_no,
                 'documentStatus': 'N',
                 'documentDate': inv.invoice_date.isoformat() if inv.invoice_date else '',
-                'documentType': inv.l10n_ao_fe_document_class_id.code,
+                'documentType': document_type,
                 'systemEntryDate': datetime.now().isoformat(),
                 'customerTaxID': inv.partner_id.vat or '999999999',
                 'customerCountry': inv.partner_id.country_id.code or 'AO',

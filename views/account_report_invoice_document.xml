@@ -1,6 +1,6 @@
 <odoo>
     <template id="report_invoice_document_inherit_fe" inherit_id="account.report_invoice_document">
-        <xpath expr="//div[@id='total']" position="after">
+        <xpath expr="//table[@name='invoice_line_table']" position="after">
             <t t-if="o.fe_qr_code">
                 <div class="text-center" style="margin-top: 50px; page-break-inside: avoid;">
                     <div style="display: inline-block; border: 1px solid #ccc; padding: 10px;">

@@ -12,7 +12,7 @@
                         Preencha os campos abaixo com cuidado, pois não poderão ser alterados após o envio.
                     </p>
                     <group>
-                        <field name="name"/>
+                        <field name="serie_code"/>
                         <field name="document_class_id" options="{'no_create': True, 'no_open': True}"/>
                         <field name="start_number"/>
                         <field name="end_number"/>

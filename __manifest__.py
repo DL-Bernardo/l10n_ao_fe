@@ -16,6 +16,7 @@ Compatível com o ambiente de homologação 2025.
         'data/ir_cron.xml',
         'views/account_move_views.xml',
         'views/fe_queue_views.xml',
+        'views/account_report_invoice_document.xml',
     ],
     'installable': True,
     'application': False,

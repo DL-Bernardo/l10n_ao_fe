@@ -1,0 +1,15 @@
+<odoo>
+    <record id="view_move_form_fe" model="ir.ui.view">
+        <field name="name">account.move.form.fe</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="arch" type="xml">
+            <button name="action_post" position="after">
+                <button name="action_send_fe" type="object" string="Enviar AGT" class="btn-primary"/>
+            </button>
+            <field name="fe_status" position="after">
+                <field name="fe_request_id"/>
+            </field>
+        </field>
+    </record>
+</odoo>

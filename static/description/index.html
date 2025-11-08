@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<title>Odoo 17 – Integração de Facturação Electrónica (AGT)</title>
+<style>
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 40px; color: #222; line-height: 1.6; }
+    h1, h2, h3 { color: #004aad; }
+    h1 { border-bottom: 3px solid #004aad; padding-bottom: 5px; }
+    code { background: #f5f5f5; padding: 3px 5px; border-radius: 4px; }
+    pre { background: #f9f9f9; border: 1px solid #ddd; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 8px 12px; text-align: left; }
+    th { background-color: #004aad; color: white; }
+    .info-box { background-color: #e6f0ff; border-left: 5px solid #004aad; padding: 10px 20px; margin: 20px 0; }
+    .footer { font-size: 0.9em; color: #555; margin-top: 50px; border-top: 1px solid #ccc; padding-top: 10px; }
+</style>
+</head>
+<body>
+
+<h1>🇦🇴 Odoo 17 – Integração de Facturação Electrónica (AGT)</h1>
+<h3>Autor: Digitalub / ContasMais<br>Versão: 1.0.0<br>Compatibilidade: Odoo 17<br>Licença: AGPL-3</h3>
+
+<div class="info-box">
+<p><strong>Descrição:</strong> O módulo <code>l10n_ao_fe</code> implementa a integração direta entre o Odoo 17 e o sistema de Facturação Electrónica da AGT, com suporte para assinatura digital, comunicação REST e geração do QR Code oficial exigido nos documentos fiscais.</p>
+</div>
+
+<h2>🧭 Funcionalidades</h2>
+<ul>
+<li>Assinatura Digital (RS256) usando chave privada RSA</li>
+<li>Integração completa com os serviços AGT (<code>registarFactura</code>, <code>consultarFactura</code>, <code>listarFacturas</code>, etc.)</li>
+<li>Fila de envio automática (<code>l10n_ao.fe.queue</code>)</li>
+<li>Geração automática do QR Code conforme as normas da AGT</li>
+<li>Compatível com Factura, Factura-Recibo, Recibo Geral e Nota de Crédito</li>
+</ul>
+
+<h2>📁 Estrutura do Módulo</h2>
+<pre>
+l10n_ao_fe/
+├── __init__.py
+├── __manifest__.py
+├── models/
+│   ├── fe_service.py
+│   ├── fe_queue.py
+│   └── account_move_inherit.py
+├── views/
+│   ├── account_move_views.xml
+│   └── fe_queue_views.xml
+├── data/
+│   └── ir_config_parameter.xml
+├── security/
+│   └── ir.model.access.csv
+└── static/
+    └── description/
+        ├── icon.png
+        └── index.html
+</pre>
+
+<h2>⚙️ Configuração</h2>
+<table>
+<tr><th>Parâmetro</th><th>Descrição</th><th>Exemplo</th></tr>
+<tr><td>fe.username</td><td>Utilizador fornecido pela AGT</td><td>username</td></tr>
+<tr><td>fe.password</td><td>Senha do utilizador</td><td>********</td></tr>
+<tr><td>fe.base_url</td><td>Endpoint base da AGT</td><td>https://sifphml.minfin.gov.ao/sigt/fe/v1</td></tr>
+<tr><td>fe.private_key_path</td><td>Caminho da chave privada RSA</td><td>/etc/odoo/ChavePrivada.pem</td></tr>
+<tr><td>fe.product_id</td><td>Identificador do software</td><td>InvoiceOne</td></tr>
+<tr><td>fe.product_version</td><td>Versão</td><td>DLV17_fe</td></tr>
+<tr><td>fe.software_validation_number</td><td>Número de validação AGT</td><td>000/2025</td></tr>
+</table>
+
+<h2>🔑 Geração de Chaves RSA</h2>
+<pre>
+cd /etc/odoo/
+openssl genrsa -out ChavePrivada.pem 2048
+openssl rsa -in ChavePrivada.pem -outform PEM -pubout -out ChavePublica.pem
+</pre>
+
+<h2>🧠 Fluxo Operacional</h2>
+<ol>
+<li>Emitir e validar a fatura no Odoo.</li>
+<li>Clicar no botão <strong>“Enviar AGT”</strong>.</li>
+<li>O sistema cria um JSON conforme o esquema DS-102 e DS-120 da AGT.</li>
+<li>Assina digitalmente e envia via REST API (<code>registarFactura</code>).</li>
+<li>Recebe o identificador e atualiza o estado na fila (<code>FEQueue</code>).</li>
+<li>Gera o QR Code da AGT no documento impresso (33x33 módulos, UTF-8, PNG).</li>
+</ol>
+
+<h2>📦 Dependências Técnicas</h2>
+<pre>pip install qrcode[pil] python-jose requests</pre>
+
+<h2>📧 Contato e Suporte</h2>
+<p><strong>Digitalub Angola – Prestação de Serviços e Comércio Geral, Lda</strong><br>
+
+📩 suporte@digitalub.ao<br>
+🌐 <a href="https://digitalub.ao">https://digitalub.ao</a><br>
+📞 +244 923 000 000</p>
+
+<div class="footer">
+<p><em>Este módulo cumpre as normas da AGT para Facturação Electrónica em Angola. Desenvolvido por <strong>Digitalub Angola</strong> com base nas especificações DS-120 e DS-102.</em></p>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,35 @@
+<odoo>
+    <record id="view_fe_queue_tree" model="ir.ui.view">
+        <field name="name">l10n_ao.fe.queue.tree</field>
+        <field name="model">l10n_ao.fe.queue</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="invoice_id"/>
+                <field name="state"/>
+                <field name="request_id"/>
+                <field name="attempts"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_fe_queue_form" model="ir.ui.view">
+        <field name="name">l10n_ao.fe.queue.form</field>
+        <field name="model">l10n_ao.fe.queue</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="invoice_id"/>
+                        <field name="state"/>
+                        <field name="request_id"/>
+                        <field name="payload"/>
+                        <field name="last_response"/>
+                    </group>
+                    <footer>
+                        <button name="action_obter_estado" type="object" string="Consultar Estado" class="btn-secondary"/>
+                    </footer>
+                </sheet>
+            </form>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,18 @@
+<odoo>
+    <record id="fe_params" model="ir.config_parameter">
+        <field name="key">fe.base_url</field>
+        <field name="value">https://sifphml.minfin.gov.ao/sigt/fe/v1</field>
+    </record>
+    <record id="fe_username" model="ir.config_parameter">
+        <field name="key">fe.username</field>
+        <field name="value">ws.hml.digitalub</field>
+    </record>
+    <record id="fe_password" model="ir.config_parameter">
+        <field name="key">fe.password</field>
+        <field name="value">mfn28552025</field>
+    </record>
+    <record id="fe_private_key_path" model="ir.config_parameter">
+        <field name="key">fe.private_key_path</field>
+        <field name="value">/opt/keys_FE/ChavePrivada.pem</field>
+    </record>
+</odoo>

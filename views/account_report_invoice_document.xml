@@ -1,0 +1,14 @@
+<odoo>
+    <template id="report_invoice_document_inherit_fe" inherit_id="account.report_invoice_document">
+        <xpath expr="//div[@id='total']" position="after">
+            <t t-if="o.fe_qr_code">
+                <div class="text-center" style="margin-top: 50px; page-break-inside: avoid;">
+                    <div style="display: inline-block; border: 1px solid #ccc; padding: 10px;">
+                        <p style="margin-bottom: 5px; font-size: 12px; font-weight: bold;">Consulta de Documento</p>
+                        <img t-att-src="'data:image/png;base64,%s' % o.fe_qr_code.decode('utf-8')" style="width: 120px; height: 120px;"/>
+                    </div>
+                </div>
+            </t>
+        </xpath>
+    </template>
+</odoo>

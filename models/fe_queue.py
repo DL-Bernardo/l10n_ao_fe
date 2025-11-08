@@ -40,34 +40,62 @@ class FEQueue(models.Model):
             })
         else:
             self.state = 'error'
-            self.error_list = str(resp.get('errorList') or resp)
+            # Use the centralized error handler to get a user-friendly message
+            try:
+                service._handle_error_response(code, resp)
+            except UserError as e:
+                self.error_list = str(e)
 
     def action_obter_estado(self):
         self.ensure_one()
         if not self.request_id:
             return
+        
         service = self.env['l10n_ao.fe.service']
         code, resp = service.obter_estado(self.request_id, self.invoice_id.company_id)
         self.last_response = str(resp)
 
-        result_code = resp.get('resultCode')
-        if code == 200 and result_code in ('0', '1', '2'):
-            doc_status = resp.get('documentStatusList', [])[0]
-            final_status = doc_status.get('documentStatus')
-            self.invoice_id.fe_status = final_status
-            if final_status == 'I':
-                errors = doc_status.get('errorList', [])
-                self.error_list = "\n".join([f"{e['idError']}: {e['descriptionError']}" for e in errors])
-                self.invoice_id.message_post(body=f"Fatura inválida pela AGT.\nErros:\n{self.error_list}")
-                self.state = 'error'
-            else:
-                self.invoice_id.message_post(body="Fatura validada com sucesso pela AGT.")
-                self.state = 'done'
-        elif result_code in ('8',): # Ainda em processamento
-            _logger.info(f"Fatura {self.invoice_id.name} ainda em processamento.")
-        else: # Erro
+        if code != 200:
             self.state = 'error'
-            self.error_list = str(resp.get('requestErrorList') or resp)
+            try:
+                service._handle_error_response(code, resp)
+            except UserError as e:
+                self.error_list = str(e)
+            return
+
+        result_code = resp.get('resultCode')
+        if result_code in ('0', '1', '2'): # Processamento concluído
+            doc_status_list = resp.get('documentStatusList', [])
+            if not doc_status_list:
+                return
+
+            doc_status = doc_status_list[0]
+            final_status = doc_status.get('documentStatus')
+            self.invoice_id.fe_status = final_status.lower()
+
+            if final_status == 'I': # Inválida
+                self.state = 'error'
+                try:
+                    # Pass the specific error list for this document
+                    service._handle_error_response(code, {'errorList': doc_status.get('errorList', [])})
+                except UserError as e:
+                    self.error_list = str(e)
+                self.invoice_id.message_post(body=_("Fatura marcada como inválida pela AGT.\n<br/><b>Erros:</b><br/>%s", self.error_list))
+            else: # Válida
+                self.state = 'done'
+                self.error_list = False
+                self.invoice_id.message_post(body=_("Fatura validada com sucesso pela AGT."))
+                self.invoice_id.generate_qr_code()
+
+        elif result_code in ('8',): # Ainda em processamento
+            _logger.info(f"Fatura {self.invoice_id.name} ainda em processamento na AGT.")
+        else: # Outro tipo de erro no pedido
+            self.state = 'error'
+            try:
+                service._handle_error_response(code, resp)
+            except UserError as e:
+                self.error_list = str(e)
+
 
     @api.model
     def _process_queue(self):

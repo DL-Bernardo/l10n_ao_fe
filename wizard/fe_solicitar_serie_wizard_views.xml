@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Formulário do Wizard para Solicitar Nova Série -->
+        <record id="view_l10n_ao_fe_solicitar_serie_wizard" model="ir.ui.view">
+            <field name="name">l10n_ao.fe.solicitar.serie.wizard.form</field>
+            <field name="model">l10n_ao.fe.solicitar.serie.wizard</field>
+            <field name="arch" type="xml">
+                <form>
+                    <p>
+                        Este assistente irá solicitar uma nova série de faturação junto da AGT.
+                        Preencha os campos abaixo com cuidado, pois não poderão ser alterados após o envio.
+                    </p>
+                    <group>
+                        <field name="name"/>
+                        <field name="document_class_id" options="{'no_create': True, 'no_open': True}"/>
+                        <field name="start_number"/>
+                        <field name="end_number"/>
+                        <field name="start_date"/>
+                        <field name="end_date"/>
+                    </group>
+                    <footer>
+                        <button name="action_solicitar_serie" string="Solicitar Série" type="object" class="btn-primary" data-hotkey="q"/>
+                        <button string="Cancelar" class="btn-secondary" special="cancel" data-hotkey="z"/>
+                    </footer>
+                </form>
+            </field>
+        </record>
+
+        <!-- Ação para abrir o Wizard -->
+        <record id="action_l10n_ao_fe_solicitar_serie" model="ir.actions.act_window">
+            <field name="name">Solicitar Nova Série</field>
+            <field name="res_model">l10n_ao.fe.solicitar.serie.wizard</field>
+            <field name="view_mode">form</field>
+            <field name="target">new</field>
+        </record>
+
+        <!-- Menu para solicitar nova série -->
+        <menuitem
+            id="menu_l10n_ao_fe_solicitar_serie"
+            name="Solicitar Nova Série"
+            parent="menu_l10n_ao_fe_root"
+            action="action_l10n_ao_fe_solicitar_serie"
+            sequence="20"/>
+    </data>
+</odoo>

@@ -1,2 +1,6 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_l10n_ao_fe_queue,l10n_ao_fe_queue,model_l10n_ao_fe_queue,,1,1,1,1
+access_l10n_ao_fe_serie,l10n_ao.fe.serie,model_l10n_ao_fe_serie,base.group_user,1,1,1,1
+access_l10n_ao_fe_document_class,l10n_ao.fe.document_class,model_l10n_ao_fe_document_class,base.group_user,1,0,0,0
+access_l10n_ao_fe_error_code,l10n_ao.fe.error_code,model_l10n_ao_fe_error_code,base.group_user,1,0,0,0
+access_l10n_ao_fe_solicitar_serie_wizard,l10n_ao.fe.solicitar.serie.wizard,model_l10n_ao_fe_solicitar_serie_wizard,base.group_user,1,1,1,1
+access_l10n_ao_fe_queue,l10n_ao.fe.queue,model_l10n_ao_fe_queue,base.group_user,1,1,1,1

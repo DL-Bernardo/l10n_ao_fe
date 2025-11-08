@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Este ficheiro pré-carrega os tipos de documentos fiscais permitidos pela AGT,
+        conforme a especificação técnica DS-120. Estes dados são essenciais para
+        a correta classificação das séries de faturação.
+    -->
+    <data noupdate="1">
+        <record id="doc_class_ft" model="l10n_ao.fe.document.class">
+            <field name="name">Factura</field>
+            <field name="code">FT</field>
+        </record>
+        <record id="doc_class_fr" model="l10n_ao.fe.document.class">
+            <field name="name">Factura/Recibo</field>
+            <field name="code">FR</field>
+        </record>
+        <record id="doc_class_nc" model="l10n_ao.fe.document.class">
+            <field name="name">Nota de Crédito</field>
+            <field name="code">NC</field>
+        </record>
+        <record id="doc_class_nd" model="l10n_ao.fe.document.class">
+            <field name="name">Nota de Débito</field>
+            <field name="code">ND</field>
+        </record>
+        <record id="doc_class_fa" model="l10n_ao.fe.document.class">
+            <field name="name">Factura de Adiantamento</field>
+            <field name="code">FA</field>
+        </record>
+        <record id="doc_class_fg" model="l10n_ao.fe.document.class">
+            <field name="name">Factura Global</field>
+            <field name="code">FG</field>
+        </record>
+        <record id="doc_class_ac" model="l10n_ao.fe.document.class">
+            <field name="name">Aviso de Cobrança</field>
+            <field name="code">AC</field>
+        </record>
+         <record id="doc_class_ar" model="l10n_ao.fe.document.class">
+            <field name="name">Aviso de Cobrança/Recibo</field>
+            <field name="code">AR</field>
+        </record>
+        <record id="doc_class_tv" model="l10n_ao.fe.document.class">
+            <field name="name">Talão de Venda</field>
+            <field name="code">TV</field>
+        </record>
+        <record id="doc_class_rc" model="l10n_ao.fe.document.class">
+            <field name="name">Recibo Emitido</field>
+            <field name="code">RC</field>
+        </record>
+        <record id="doc_class_rg" model="l10n_ao.fe.document.class">
+            <field name="name">Recibo</field>
+            <field name="code">RG</field>
+        </record>
+        <record id="doc_class_re" model="l10n_ao.fe.document.class">
+            <field name="name">Estorno ou Recibo de Estorno</field>
+            <field name="code">RE</field>
+        </record>
+        <record id="doc_class_af" model="l10n_ao.fe.document.class">
+            <field name="name">Factura/Recibo de Autofacturação</field>
+            <field name="code">AF</field>
+        </record>
+        <record id="doc_class_rp" model="l10n_ao.fe.document.class">
+            <field name="name">Prémio ou Recibo de Prémio</field>
+            <field name="code">RP</field>
+        </record>
+        <record id="doc_class_ra" model="l10n_ao.fe.document.class">
+            <field name="name">Resseguro Aceite</field>
+            <field name="code">RA</field>
+        </record>
+        <record id="doc_class_cs" model="l10n_ao.fe.document.class">
+            <field name="name">Imputação a Co-seguradoras</field>
+            <field name="code">CS</field>
+        </record>
+        <record id="doc_class_ld" model="l10n_ao.fe.document.class">
+            <field name="name">Imputação a Co-seguradora Líder</field>
+            <field name="code">LD</field>
+        </record>
+    </data>
+</odoo>

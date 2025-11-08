@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Este ficheiro contém a lista de códigos de erro e as suas descrições,
+        baseado na especificação técnica DS-120 da AGT. Estes dados são usados
+        para apresentar mensagens claras ao utilizador em caso de falha na
+        comunicação com o webservice.
+    -->
+    <data noupdate="1">
+        <record id="err_e01" model="l10n_ao.fe.error.code">
+            <field name="code">E01</field>
+            <field name="description">Falta de parâmetro obrigatório.</field>
+        </record>
+        <record id="err_e02" model="l10n_ao.fe.error.code">
+            <field name="code">E02</field>
+            <field name="description">Formato inválido de parâmetro.</field>
+        </record>
+        <record id="err_e03" model="l10n_ao.fe.error.code">
+            <field name="code">E03</field>
+            <field name="description">Valor não esperado para o parâmetro.</field>
+        </record>
+        <record id="err_e04" model="l10n_ao.fe.error.code">
+            <field name="code">E04</field>
+            <field name="description">O número de faturas em 'numberOfEntries' não coincide com o número de documentos enviados.</field>
+        </record>
+        <record id="err_e05" model="l10n_ao.fe.error.code">
+            <field name="code">E05</field>
+            <field name="description">O NIF do emissor não possui atividade registada na AGT.</field>
+        </record>
+        <record id="err_e06" model="l10n_ao.fe.error.code">
+            <field name="code">E06</field>
+            <field name="description">O contribuinte não aderiu à faturação eletrónica.</field>
+        </record>
+        <record id="err_e07" model="l10n_ao.fe.error.code">
+            <field name="code">E07</field>
+            <field name="description">Software de faturação não certificado.</field>
+        </record>
+        <record id="err_e08" model="l10n_ao.fe.error.code">
+            <field name="code">E08</field>
+            <field name="description">A assinatura digital do produtor de software (jwsSoftwareSignature) é inválida.</field>
+        </record>
+        <record id="err_e09" model="l10n_ao.fe.error.code">
+            <field name="code">E09</field>
+            <field name="description">A fatura especificada já consta no repositório do sistema.</field>
+        </record>
+        <record id="err_e10" model="l10n_ao.fe.error.code">
+            <field name="code">E10</field>
+            <field name="description">Especificação incorreta do contribuinte (customerTaxID, taxIDNumber, taxIDCountry).</field>
+        </record>
+        <record id="err_e11" model="l10n_ao.fe.error.code">
+            <field name="code">E11</field>
+            <field name="description">O NIF angolano especificado é desconhecido no sistema da AGT.</field>
+        </record>
+        <record id="err_e12" model="l10n_ao.fe.error.code">
+            <field name="code">E12</field>
+            <field name="description">Número de linha de artigo incorreto (repetição ou quebra de sequência).</field>
+        </record>
+        <record id="err_e13" model="l10n_ao.fe.error.code">
+            <field name="code">E13</field>
+            <field name="description">É esperado um documento de referência que não foi especificado.</field>
+        </record>
+        <record id="err_e14" model="l10n_ao.fe.error.code">
+            <field name="code">E14</field>
+            <field name="description">O documento de referência preenchido é desconhecido do sistema.</field>
+        </record>
+        <record id="err_e28" model="l10n_ao.fe.error.code">
+            <field name="code">E28</field>
+            <field name="description">O NIF do emissor não aderiu à faturação eletrónica no sistema da AGT.</field>
+        </record>
+        <record id="err_e29" model="l10n_ao.fe.error.code">
+            <field name="code">E29</field>
+            <field name="description">A data de emissão do documento é anterior à data de adesão à faturação eletrónica.</field>
+        </record>
+        <record id="err_e31" model="l10n_ao.fe.error.code">
+            <field name="code">E31</field>
+            <field name="description">O código de série de numeração já se encontra em utilização.</field>
+        </record>
+        <record id="err_e32" model="l10n_ao.fe.error.code">
+            <field name="code">E32</field>
+            <field name="description">Código de série mal construído. Deve conter o ano de emissão com 2 ou 4 dígitos.</field>
+        </record>
+        <record id="err_e34" model="l10n_ao.fe.error.code">
+            <field name="code">E34</field>
+            <field name="description">A série da fatura é inexistente para o contribuinte.</field>
+        </record>
+        <record id="err_e36" model="l10n_ao.fe.error.code">
+            <field name="code">E36</field>
+            <field name="description">O software de faturação que está a gerar a fatura não coincide com o que gerou a série.</field>
+        </record>
+        <record id="err_e37" model="l10n_ao.fe.error.code">
+            <field name="code">E37</field>
+            <field name="description">O tipo de fatura a emitir não coincide com o tipo de fatura destinado à série.</field>
+        </record>
+        <record id="err_e40" model="l10n_ao.fe.error.code">
+            <field name="code">E40</field>
+            <field name="description">A assinatura digital da chamada de serviço (jwsSignature) é inválida.</field>
+        </record>
+    </data>
+</odoo>

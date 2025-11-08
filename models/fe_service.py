@@ -21,7 +21,7 @@ class FEDeviceService(models.AbstractModel):
             'username': ICP.get_param('l10n_ao_fe.username'),
             'password': ICP.get_param('l10n_ao_fe.password'),
             'base_url': ICP.get_param('l10n_ao_fe.base_url', 'https://sifphml.minfin.gov.ao/sigt/fe/v1'),
-            'private_key': ICP.get_param('l10n_ao_fe.private_key'),
+            'private_key_path': ICP.get_param('l10n_ao_fe.private_key_path'),
             'product_id': ICP.get_param('l10n_ao_fe.product_id', 'ODFE_MOD_01'),
             'product_version': ICP.get_param('l10n_ao_fe.product_version', '1.0'),
             'software_validation_number': ICP.get_param('l10n_ao_fe.software_validation_number'),
@@ -53,10 +53,17 @@ class FEDeviceService(models.AbstractModel):
 
     def sign_object_rs256(self, obj: dict) -> str:
         conf = self._get_conf()
-        private_key = conf.get('private_key')
-        if not private_key:
-            raise UserError(_('A chave privada (l10n_ao_fe.private_key) não está configurada!'))
+        private_key_path = conf.get('private_key_path')
+        if not private_key_path:
+            raise UserError(_('O caminho para a chave privada (l10n_ao_fe.private_key_path) não está configurado!'))
         
+        try:
+            with open(private_key_path, 'r') as f:
+                private_key = f.read()
+        except Exception as e:
+            _logger.error("Não foi possível ler a chave privada em %s: %s", private_key_path, e)
+            raise UserError(_("Não foi possível ler o ficheiro da chave privada no caminho especificado: %s", private_key_path))
+
         # Ensure keys are sorted for consistent signature generation
         payload = json.dumps(obj, sort_keys=True, separators=(',', ':'), ensure_ascii=False)
         return jws.sign(payload.encode('utf-8'), private_key, algorithm='RS256')

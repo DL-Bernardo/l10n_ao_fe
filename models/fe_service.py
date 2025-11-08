@@ -17,20 +17,20 @@ class FEDeviceService(models.AbstractModel):
     def _get_conf(self):
         ICP = self.env['ir.config_parameter'].sudo()
         return {
-            'username': ICP.get_param('fe.username'),
-            'password': ICP.get_param('fe.password'),
-            'base_url': ICP.get_param('fe.base_url', 'https://sifphml.minfin.gov.ao/sigt/fe/v1'),
-            'private_key': ICP.get_param('fe.private_key'),
-            'product_id': ICP.get_param('fe.product_id'),
-            'product_version': ICP.get_param('fe.product_version'),
-            'software_validation_number': ICP.get_param('fe.software_validation_number'),
+            'username': ICP.get_param('l10n_ao_fe.username'),
+            'password': ICP.get_param('l10n_ao_fe.password'),
+            'base_url': ICP.get_param('l10n_ao_fe.base_url', 'https://sifphml.minfin.gov.ao/sigt/fe/v1'),
+            'private_key': ICP.get_param('l10n_ao_fe.private_key'),
+            'product_id': ICP.get_param('l10n_ao_fe.product_id'),
+            'product_version': ICP.get_param('l10n_ao_fe.product_version'),
+            'software_validation_number': ICP.get_param('l10n_ao_fe.software_validation_number'),
         }
 
     def sign_object_rs256(self, obj: dict) -> str:
         conf = self._get_conf()
         private_key = conf.get('private_key')
         if not private_key:
-            raise ValueError('A chave privada (fe.private_key) não está configurada!')
+            raise ValueError('A chave privada (l10n_ao_fe.private_key) não está configurada!')
         payload = json.dumps(obj, separators=(',', ':'), ensure_ascii=False)
         return jws.sign(payload, private_key, algorithm='RS256')
 

@@ -1,5 +1,14 @@
+import requests
+import json
+from jose import jws
+import uuid
+from datetime import datetime, timezone
+import logging
+
 from odoo import models, _
 from odoo.exceptions import UserError
+
+_logger = logging.getLogger(__name__)
 
 
 class FEDeviceService(models.AbstractModel):
@@ -208,3 +217,57 @@ class FEDeviceService(models.AbstractModel):
             "jwsSignature": jws_signature,
         }
         return self._make_request('listarSeries', payload)
+
+    def listar_facturas(self, company, query_start_date, query_end_date):
+        """ Calls the listarFacturas endpoint """
+        software_info_detail = self.build_software_info()
+        software_info = {
+            'softwareInfoDetail': software_info_detail,
+            'jwsSoftwareSignature': self.sign_object_rs256(software_info_detail)
+        }
+
+        signature_payload = {
+            'taxRegistrationNumber': company.vat or '',
+            'queryStartDate': query_start_date.isoformat(),
+            'queryEndDate': query_end_date.isoformat(),
+        }
+        jws_signature = self.sign_object_rs256(signature_payload)
+
+        payload = {
+            "schemaVersion": "1.0",
+            "submissionGUID": str(uuid.uuid4()),
+            "taxRegistrationNumber": company.vat or '',
+            "submissionTimeStamp": datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
+            "softwareInfo": software_info,
+            "queryStartDate": signature_payload['queryStartDate'],
+            "queryEndDate": signature_payload['queryEndDate'],
+            "jwsSignature": jws_signature,
+        }
+        return self._make_request('listarFacturas', payload)
+
+    def consultar_factura(self, company, invoice_no):
+        """ Calls the consultarFactura endpoint """
+        software_info_detail = self.build_software_info()
+        software_info = {
+            'softwareInfoDetail': software_info_detail,
+            'jwsSoftwareSignature': self.sign_object_rs256(software_info_detail)
+        }
+
+        # The specification (4.4.20) has a typo and says to sign 'requestID', 
+        # but the parameter is 'invoiceNo'. We assume it should be 'invoiceNo'.
+        signature_payload = {
+            'taxRegistrationNumber': company.vat or '',
+            'invoiceNo': invoice_no,
+        }
+        jws_signature = self.sign_object_rs256(signature_payload)
+
+        payload = {
+            "schemaVersion": "1.0",
+            "submissionGUID": str(uuid.uuid4()),
+            "taxRegistrationNumber": company.vat or '',
+            "submissionTimeStamp": datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
+            "invoiceNo": invoice_no,
+            "softwareInfo": software_info,
+            "jwsSignature": jws_signature
+        }
+        return self._make_request('consultarFactura', payload)

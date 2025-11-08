@@ -16,6 +16,7 @@ Compatível com o ambiente de homologação 2025.
         'data/ir_config_parameter.xml',
         'data/fe_document_class_data.xml',
         'data/fe_error_code_data.xml',
+        'views/account_tax_views.xml',
         'views/account_move_views.xml',
         'views/fe_queue_views.xml',
         'views/fe_serie_views.xml',

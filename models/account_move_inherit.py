@@ -69,14 +69,18 @@ class AccountMoveInherit(models.Model):
             for line in inv.invoice_line_ids.filtered(lambda l: not l.display_type):
                 taxes = []
                 for tax in line.tax_ids:
-                    taxes.append({
+                    tax_data = {
                         'taxType': 'IVA',
                         'taxCountryRegion': 'AO',
                         'taxCode': 'NOR', # This could be more dynamic
                         'taxPercentage': str(tax.amount),
                         'taxBase': str(line.price_subtotal),
                         'taxAmount': str(line.price_total - line.price_subtotal),
-                    })
+                    }
+                    if tax.l10n_ao_fe_exemption_code:
+                        tax_data['taxExemptionCode'] = tax.l10n_ao_fe_exemption_code
+                    
+                    taxes.append(tax_data)
 
                 lines.append({
                     'lineNumber': str(line.sequence),

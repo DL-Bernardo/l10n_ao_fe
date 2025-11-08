@@ -1,18 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <record id="fe_params" model="ir.config_parameter">
-        <field name="key">fe.base_url</field>
-        <field name="value">https://sifphml.minfin.gov.ao/sigt/fe/v1</field>
-    </record>
-    <record id="fe_username" model="ir.config_parameter">
-        <field name="key">fe.username</field>
-        <field name="value">ws.hml.digitalub</field>
-    </record>
-    <record id="fe_password" model="ir.config_parameter">
-        <field name="key">fe.password</field>
-        <field name="value">mfn28552025</field>
-    </record>
-    <record id="fe_private_key_path" model="ir.config_parameter">
-        <field name="key">fe.private_key_path</field>
-        <field name="value">/opt/keys_FE/ChavePrivada.pem</field>
-    </record>
+    <data noupdate="1">
+        <!-- Parâmetros de Configuração para a Integração FE da AGT -->
+        <record id="fe_base_url" model="ir.config_parameter">
+            <field name="key">l10n_ao_fe.base_url</field>
+            <field name="value">https://sifphml.minfin.gov.ao/sigt/fe/v1</field>
+        </record>
+
+        <record id="fe_username" model="ir.config_parameter">
+            <field name="key">l10n_ao_fe.username</field>
+            <field name="value">ws.hml.digitalub</field>
+        </record>
+
+        <record id="fe_password" model="ir.config_parameter">
+            <field name="key">l10n_ao_fe.password</field>
+            <field name="value">mfn28552025</field>
+        </record>
+
+        <record id="fe_private_key" model="ir.config_parameter">
+            <field name="key">l10n_ao_fe.private_key</field>
+            <field name="value"></field>
+        </record>
+
+        <record id="fe_product_id" model="ir.config_parameter">
+            <field name="key">l10n_ao_fe.product_id</field>
+            <field name="value">InvoiceOne</field>
+        </record>
+
+        <record id="fe_product_version" model="ir.config_parameter">
+            <field name="key">l10n_ao_fe.product_version</field>
+            <field name="value">DLV17_fe</field>
+        </record>
+
+        <record id="fe_software_validation_number" model="ir.config_parameter">
+            <field name="key">l10n_ao_fe.software_validation_number</field>
+            <field name="value">0000/AGT/2025</field>
+        </record>
+    </data>
 </odoo>

@@ -10,6 +10,7 @@ import base64
 from PIL import Image
 import os
 from odoo.exceptions import UserError
+import json
 
 
 class AccountMoveInherit(models.Model):
@@ -36,6 +37,20 @@ class AccountMoveInherit(models.Model):
         related='l10n_ao_fe_serie_id.document_class_id',
         store=True
     )
+    l10n_ao_fe_queue_ids = fields.One2many('l10n_ao.fe.queue', 'invoice_id', string='Fila de Envio AGT')
+    l10n_ao_fe_payload_json = fields.Text(string="Payload JSON", compute='_compute_payload_json', store=False)
+
+    @api.depends('l10n_ao_fe_queue_ids')
+    def _compute_payload_json(self):
+        for move in self:
+            payload_str = ""
+            if move.l10n_ao_fe_queue_ids:
+                # Get the most recent queue record
+                latest_queue_record = move.l10n_ao_fe_queue_ids.sorted(key=lambda r: r.create_date, reverse=True)[0]
+                if latest_queue_record.payload:
+                    # Pretty-print the JSON
+                    payload_str = json.dumps(latest_queue_record.payload, indent=2, ensure_ascii=False)
+            move.l10n_ao_fe_payload_json = payload_str
 
     @api.onchange('journal_id')
     def _onchange_journal_id(self):

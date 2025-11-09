@@ -1,280 +1,169 @@
-import requests
+# -*- coding: utf-8 -*-
 import json
-from jose import jws
 import uuid
-from datetime import datetime, timezone
-import logging
+import datetime
+import requests
+from jose import jws
 
-from odoo import models, _
+from odoo import models, fields, api, _
 from odoo.exceptions import UserError
+import logging
 
 _logger = logging.getLogger(__name__)
 
+class FeService(models.Model):
+    _name = "l10n_ao.fe.service"
+    _description = "Serviço de Facturação Electrónica AGT"
 
-class FEDeviceService(models.AbstractModel):
-    _name = 'l10n_ao.fe.service'
-    _description = 'Serviço de integração com AGT FE'
+    def _get_conf(self, param_name, default=None):
+        return self.env["ir.config_parameter"].sudo().get_param(f"l10n_ao_fe.{param_name}", default)
 
-    def _get_conf(self):
-        ICP = self.env['ir.config_parameter'].sudo()
-        return {
-            'username': ICP.get_param('l10n_ao_fe.username'),
-            'password': ICP.get_param('l10n_ao_fe.password'),
-            'base_url': ICP.get_param('l10n_ao_fe.base_url', 'https://sifphml.minfin.gov.ao/sigt/fe/v1'),
-            'private_key_path': ICP.get_param('l10n_ao_fe.private_key_path'),
-            'product_id': ICP.get_param('l10n_ao_fe.product_id', 'ODFE_MOD_01'),
-            'product_version': ICP.get_param('l10n_ao_fe.product_version', '1.0'),
-            'software_validation_number': ICP.get_param('l10n_ao_fe.software_validation_number'),
+    def _generate_invoice_payload(self, move):
+        """Gera o payload JSON conforme o padrão da AGT."""
+        self.ensure_one()
+
+        # 🧾 1. Dados base do envio
+        submission_uuid = str(uuid.uuid4())
+        timestamp = datetime.datetime.utcnow().isoformat()
+
+        # ⚙️ 2. Assinatura do software
+        private_key = self._get_conf("private_key")
+        if not private_key:
+            raise UserError(_("A chave privada para a assinatura JWS não está configurada. Por favor, defina 'l10n_ao_fe.private_key' nos parâmetros do sistema."))
+
+        software_payload = {
+            "productId": self._get_conf("product_id", "DIGITALUB-FE"),
+            "productVersion": self._get_conf("product_version", "1.0.0"),
+            "softwareValidationNumber": self._get_conf("software_validation_number", "HML-TESTE-001")
         }
-
-    def _handle_error_response(self, code, resp):
-        """Centralized error handler"""
-        error_list = resp.get('errorList', [])
-        if error_list:
-            error_messages = []
-            for error in error_list:
-                error_code = error.get('idError')
-                error_description = error.get('descriptionError')
-                
-                # Try to find a more user-friendly message
-                friendly_error = self.env['l10n_ao.fe.error.code'].search([('code', '=', error_code)], limit=1)
-                if friendly_error:
-                    message = f"({error_code}) {friendly_error.description}"
-                else:
-                    message = f"({error_code}) {error_description}"
-                error_messages.append(message)
-            
-            final_message = "\n".join(error_messages)
-            raise UserError(_("A AGT retornou os seguintes erros:\n\n%s", final_message))
-        
-        # Fallback for other errors
-        error_detail = resp.get('error', str(resp))
-        raise UserError(_("Erro de comunicação com a AGT (HTTP %s):\n%s", code, error_detail))
-
-    def sign_object_rs256(self, obj: dict) -> str:
-        conf = self._get_conf()
-        private_key_path = conf.get('private_key_path')
-        if not private_key_path:
-            raise UserError(_('O caminho para a chave privada (l10n_ao_fe.private_key_path) não está configurado!'))
         
         try:
-            with open(private_key_path, 'r') as f:
-                private_key = f.read()
+            software_signature = jws.sign(software_payload, private_key, algorithm="RS256")
         except Exception as e:
-            _logger.error("Não foi possível ler a chave privada em %s: %s", private_key_path, e)
-            raise UserError(_("Não foi possível ler o ficheiro da chave privada no caminho especificado: %s", private_key_path))
+            _logger.error("Falha ao assinar o payload do software: %s", e)
+            raise UserError(_("Falha ao assinar o payload do software. Verifique a chave privada. Erro: %s", e))
 
-        # Ensure keys are sorted for consistent signature generation
-        payload = json.dumps(obj, sort_keys=True, separators=(',', ':'), ensure_ascii=False)
-        return jws.sign(payload.encode('utf-8'), private_key, algorithm='RS256')
+        # 💼 3. Linhas da fatura
+        lines = []
+        for i, line in enumerate(move.invoice_line_ids.filtered(lambda l: not l.display_type), 1):
+            tax_percentage = 0.0
+            tax_exemption_reason = "M00" # Isento por defeito
+            tax_exemption_code = "NS" # Não sujeito por defeito
 
-    def build_software_info(self):
-        conf = self._get_conf()
-        return {
-            'productId': conf.get('product_id'),
-            'productVersion': conf.get('product_version'),
-            'softwareValidationNumber': conf.get('software_validation_number'),
+            if line.tax_ids:
+                # Assumindo o primeiro imposto para simplificação
+                tax = line.tax_ids[0]
+                tax_percentage = tax.amount
+                if tax.l10n_ao_fe_exemption_code:
+                    tax_exemption_reason = tax.l10n_ao_fe_exemption_reason or ''
+                    tax_exemption_code = tax.l10n_ao_fe_exemption_code
+                else:
+                    tax_exemption_reason = ""
+                    tax_exemption_code = ""
+
+
+            lines.append({
+                "lineNumber": str(i),
+                "productCode": line.product_id.default_code or f"PROD-{line.product_id.id}",
+                "productDescription": line.name,
+                "quantity": line.quantity,
+                "unitOfMeasure": line.product_uom_id.name or "Un",
+                "unitPrice": line.price_unit,
+                "taxPointDate": move.invoice_date.strftime("%Y-%m-%d"),
+                "taxExemptionReason": tax_exemption_reason,
+                "taxExemptionCode": tax_exemption_code,
+                "taxPercentage": tax_percentage,
+                "debitAmount": line.price_subtotal if move.move_type in ('out_invoice', 'in_refund') else 0.0,
+                "creditAmount": line.price_subtotal if move.move_type in ('out_refund', 'in_invoice') else 0.0,
+            })
+
+        # 🧩 4. Assinatura do documento (fatura)
+        document_payload = {
+            "documentNo": move.name,
+            "companyName": move.company_id.name,
+            "taxRegistrationNumber": move.company_id.vat,
+            "timestamp": timestamp,
+        }
+        try:
+            document_signature = jws.sign(document_payload, private_key, algorithm="RS256")
+        except Exception as e:
+            _logger.error("Falha ao assinar o payload do documento: %s", e)
+            raise UserError(_("Falha ao assinar o payload do documento. Verifique a chave privada. Erro: %s", e))
+
+        # 🧠 5. Montagem final do JSON
+        document_type = move.l10n_ao_fe_document_class_id.code if move.l10n_ao_fe_document_class_id else 'FT'
+        
+        payload = {
+            "schemaVersion": "1.0",
+            "submissionUUID": submission_uuid,
+            "submissionTimeStamp": timestamp,
+            "taxRegistrationNumber": move.company_id.vat,
+            "softwareInfo": {
+                "softwareInfoDetail": software_payload,
+                "jwsSoftwareSignature": software_signature,
+            },
+            "numberOfEntries": 1,
+            "documents": [
+                {
+                    "documentNo": move.name,
+                    "documentStatus": "N",
+                    "documentDate": str(move.invoice_date),
+                    "documentType": document_type,
+                    "systemEntryDate": timestamp,
+                    "customerTaxID": move.partner_id.vat or "999999999",
+                    "customerCountry": move.partner_id.country_id.code or "AO",
+                    "companyName": move.company_id.name,
+                    "documentTotals": {
+                        "netTotal": move.amount_untaxed,
+                        "grossTotal": move.amount_total,
+                        "taxPayable": move.amount_tax,
+                    },
+                    "lines": lines,
+                    "jwsDocumentSignature": document_signature,
+                }
+            ],
         }
 
-    def _make_request(self, endpoint, payload):
-        conf = self._get_conf()
-        url = conf['base_url'].rstrip('/') + '/' + endpoint
+        return json.dumps(payload, indent=2, ensure_ascii=False)
+
+    def _send_to_agt(self, payload_json):
+        """Envia o payload JSON para o endpoint da AGT."""
+        url = self._get_conf("base_url", "https://sifphml.minfin.gov.ao/sigt/fe/v1") + "/registarFactura"
+        username = self._get_conf("username")
+        password = self._get_conf("password")
+
+        if not username or not password:
+            raise UserError(_("As credenciais de acesso à AGT (username/password) não estão configuradas."))
+
+        _logger.info("Enviando payload para AGT em %s", url)
+        _logger.debug("Payload: %s", payload_json)
 
         try:
             resp = requests.post(
-                url, json=payload,
-                auth=(conf['username'], conf['password']),
-                headers={'Accept': 'application/json', 'Content-Type': 'application/json; charset=utf-8'},
-                timeout=60
+                url,
+                data=payload_json.encode('utf-8'),
+                headers={
+                    "Content-Type": "application/json; charset=utf-8",
+                    "Accept": "application/json",
+                },
+                auth=(username, password),
+                timeout=60,
             )
             resp.raise_for_status()
-            return resp.status_code, resp.json()
-        except requests.exceptions.JSONDecodeError:
-            return resp.status_code, {'error': resp.text}
-        except requests.exceptions.HTTPError as e:
-            _logger.error("Erro HTTP ao comunicar com FE: %s, Resposta: %s", e, e.response.text)
+        except requests.exceptions.RequestException as e:
+            _logger.error("Erro de comunicação com a AGT: %s", e)
+            raise UserError(_("Erro de comunicação com a AGT: %s", e))
+
+        _logger.info("Resposta da AGT: %s", resp.status_code)
+        _logger.debug("Corpo da resposta: %s", resp.text)
+        
+        if resp.status_code in (200, 201, 202):
+            return resp.json()
+        else:
             try:
-                return e.response.status_code, e.response.json()
+                error_data = resp.json()
+                error_list = error_data.get("errorList", [])
+                error_msgs = [f"({e.get('idError')}) {e.get('descriptionError')}" for e in error_list]
+                raise UserError(_("A AGT retornou um erro:\n%s", "\n".join(error_msgs)))
             except json.JSONDecodeError:
-                return e.response.status_code, {'error': e.response.text}
-        except Exception as e:
-            _logger.exception("Erro ao comunicar com FE: %s", e)
-            return 500, {'error': str(e)}
-
-    def build_document_signature_fields(self, inv):
-        return {
-            'documentNo': inv.name,
-            'taxRegistrationNumber': inv.company_id.vat or '',
-            'documentType': inv.l10n_ao_fe_document_class_id.code,
-            'documentDate': inv.invoice_date.isoformat() if inv.invoice_date else '',
-            'customerTaxID': inv.partner_id.vat or '',
-            'customerCountry': inv.partner_id.country_id.code or 'AO',
-            'companyName': inv.company_id.name,
-            'documentTotals': {
-                'grossTotal': inv.amount_total,
-                'netTotal': inv.amount_untaxed,
-                'taxPayable': inv.amount_tax,
-            },
-        }
-
-    def registar_facturas(self, company, documents: list):
-        software_info_detail = self.build_software_info()
-        software_info = {
-            'softwareInfoDetail': software_info_detail,
-            'jwsSoftwareSignature': self.sign_object_rs256(software_info_detail)
-        }
-
-        payload = {
-            'schemaVersion': '1.0',
-            'submissionGUID': str(uuid.uuid4()),
-            'taxRegistrationNumber': company.vat or '',
-            'submissionTimeStamp': datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
-            'softwareInfo': software_info,
-            'numberOfEntries': str(len(documents)),
-            'documents': documents,
-        }
-        return self._make_request('registarFactura', payload)
-
-    def obter_estado(self, request_id, company):
-        software_info_detail = self.build_software_info()
-        software_info = {
-            'softwareInfoDetail': software_info_detail,
-            'jwsSoftwareSignature': self.sign_object_rs256(software_info_detail)
-        }
-
-        signature_payload = {
-            'taxRegistrationNumber': company.vat or '',
-            'requestID': request_id,
-        }
-        jws_signature = self.sign_object_rs256(signature_payload)
-
-        payload = {
-            "schemaVersion": "1.0",
-            "submissionGUID": str(uuid.uuid4()),
-            "taxRegistrationNumber": company.vat or '',
-            "submissionTimeStamp": datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
-            "softwareInfo": software_info,
-            "requestID": request_id,
-            "jwsSignature": jws_signature
-        }
-        return self._make_request('obterEstado', payload)
-
-    def solicitar_serie(self, serie_code, doc_class_code, start_number, end_number, start_date, end_date=None):
-        company = self.env.company
-        software_info_detail = self.build_software_info()
-        software_info = {
-            'softwareInfoDetail': software_info_detail,
-            'jwsSoftwareSignature': self.sign_object_rs256(software_info_detail)
-        }
-
-        serie_details = {
-            'serieCode': serie_code,
-            'documentClass': doc_class_code,
-            'startNumber': str(start_number),
-            'endNumber': str(end_number),
-            'startDate': start_date.isoformat(),
-        }
-        if end_date:
-            serie_details['endDate'] = end_date.isoformat()
-
-        signature_payload = {
-            'taxRegistrationNumber': company.vat or '',
-            'serieCode': serie_code,
-            'documentClass': doc_class_code,
-        }
-        jws_signature = self.sign_object_rs256(signature_payload)
-
-        payload = {
-            "schemaVersion": "1.0",
-            "submissionGUID": str(uuid.uuid4()),
-            "taxRegistrationNumber": company.vat or '',
-            "submissionTimeStamp": datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
-            "softwareInfo": software_info,
-            "serieDetails": serie_details,
-            "jwsSignature": jws_signature,
-        }
-        return self._make_request('solicitarSerie', payload)
-
-    def listar_series(self):
-        company = self.env.company
-        software_info_detail = self.build_software_info()
-        software_info = {
-            'softwareInfoDetail': software_info_detail,
-            'jwsSoftwareSignature': self.sign_object_rs256(software_info_detail)
-        }
-
-        query_end_date = datetime.utcnow().date()
-        query_start_date = query_end_date.replace(year=query_end_date.year - 1)
-
-        signature_payload = {
-            'taxRegistrationNumber': company.vat or '',
-            'queryStartDate': query_start_date.isoformat(),
-            'queryEndDate': query_end_date.isoformat(),
-        }
-        jws_signature = self.sign_object_rs256(signature_payload)
-
-        payload = {
-            "schemaVersion": "1.0",
-            "submissionGUID": str(uuid.uuid4()),
-            "taxRegistrationNumber": company.vat or '',
-            "submissionTimeStamp": datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
-            "softwareInfo": software_info,
-            "queryStartDate": signature_payload['queryStartDate'],
-            "queryEndDate": signature_payload['queryEndDate'],
-            "jwsSignature": jws_signature,
-        }
-        return self._make_request('listarSeries', payload)
-
-    def listar_facturas(self, company, query_start_date, query_end_date):
-        """ Calls the listarFacturas endpoint """
-        software_info_detail = self.build_software_info()
-        software_info = {
-            'softwareInfoDetail': software_info_detail,
-            'jwsSoftwareSignature': self.sign_object_rs256(software_info_detail)
-        }
-
-        signature_payload = {
-            'taxRegistrationNumber': company.vat or '',
-            'queryStartDate': query_start_date.isoformat(),
-            'queryEndDate': query_end_date.isoformat(),
-        }
-        jws_signature = self.sign_object_rs256(signature_payload)
-
-        payload = {
-            "schemaVersion": "1.0",
-            "submissionGUID": str(uuid.uuid4()),
-            "taxRegistrationNumber": company.vat or '',
-            "submissionTimeStamp": datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
-            "softwareInfo": software_info,
-            "queryStartDate": signature_payload['queryStartDate'],
-            "queryEndDate": signature_payload['queryEndDate'],
-            "jwsSignature": jws_signature,
-        }
-        return self._make_request('listarFacturas', payload)
-
-    def consultar_factura(self, company, invoice_no):
-        """ Calls the consultarFactura endpoint """
-        software_info_detail = self.build_software_info()
-        software_info = {
-            'softwareInfoDetail': software_info_detail,
-            'jwsSoftwareSignature': self.sign_object_rs256(software_info_detail)
-        }
-
-        # The specification (4.4.20) has a typo and says to sign 'requestID', 
-        # but the parameter is 'invoiceNo'. We assume it should be 'invoiceNo'.
-        signature_payload = {
-            'taxRegistrationNumber': company.vat or '',
-            'invoiceNo': invoice_no,
-        }
-        jws_signature = self.sign_object_rs256(signature_payload)
-
-        payload = {
-            "schemaVersion": "1.0",
-            "submissionGUID": str(uuid.uuid4()),
-            "taxRegistrationNumber": company.vat or '',
-            "submissionTimeStamp": datetime.utcnow().replace(tzinfo=timezone.utc).isoformat(),
-            "invoiceNo": invoice_no,
-            "softwareInfo": software_info,
-            "jwsSignature": jws_signature
-        }
-        return self._make_request('consultarFactura', payload)
+                raise UserError(_("A AGT retornou uma resposta inesperada (HTTP %s): %s", resp.status_code, resp.text))

@@ -11,6 +11,11 @@
                 <field name="fe_status"/>
                 <field name="fe_request_id"/>
             </field>
+            <xpath expr="//notebook" position="inside">
+                <page string="Payload AGT" name="agt_payload">
+                    <field name="l10n_ao_fe_payload_json" readonly="1"/>
+                </page>
+            </xpath>
         </field>
     </record>
 </odoo>

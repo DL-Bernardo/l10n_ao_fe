@@ -11,7 +11,7 @@ import logging
 
 _logger = logging.getLogger(__name__)
 
-class FeService(models.Model):
+class FeService(models.AbstractModel):
     _name = "l10n_ao.fe.service"
     _description = "Serviço de Facturação Electrónica AGT"
 
@@ -20,16 +20,24 @@ class FeService(models.Model):
 
     def _generate_invoice_payload(self, move):
         """Gera o payload JSON conforme o padrão da AGT."""
-        self.ensure_one()
+        # self.ensure_one() # Removed as this is an AbstractModel and ensure_one is not applicable here.
 
         # 🧾 1. Dados base do envio
         submission_uuid = str(uuid.uuid4())
         timestamp = datetime.datetime.utcnow().isoformat()
 
         # ⚙️ 2. Assinatura do software
-        private_key = self._get_conf("private_key")
-        if not private_key:
-            raise UserError(_("A chave privada para a assinatura JWS não está configurada. Por favor, defina 'l10n_ao_fe.private_key' nos parâmetros do sistema."))
+        private_key_path = self._get_conf("private_key_path")
+        if not private_key_path:
+            raise UserError(_("O caminho para a chave privada para a assinatura JWS não está configurado. Por favor, defina 'l10n_ao_fe.private_key_path' nos parâmetros do sistema."))
+
+        try:
+            with open(private_key_path, 'r') as f:
+                private_key = f.read()
+        except FileNotFoundError:
+            raise UserError(_("O ficheiro da chave privada não foi encontrado no caminho especificado: %s", private_key_path))
+        except Exception as e:
+            raise UserError(_("Erro ao ler o ficheiro da chave privada: %s", e))
 
         software_payload = {
             "productId": self._get_conf("product_id", "DIGITALUB-FE"),
@@ -125,6 +133,49 @@ class FeService(models.Model):
         }
 
         return json.dumps(payload, indent=2, ensure_ascii=False)
+
+    def _get_agt_status(self, submission_uuid):
+        """Consulta o estado de uma submissão na AGT usando o endpoint ObterEstado."""
+        url = self._get_conf("base_url", "https://sifphml.minfin.gov.ao/sigt/fe/v1") + "/obterEstado"
+        username = self._get_conf("username")
+        password = self._get_conf("password")
+
+        if not username or not password:
+            raise UserError(_("As credenciais de acesso à AGT (username/password) não estão configuradas."))
+
+        # Assuming submissionUUID is passed as a query parameter
+        params = {'submissionUUID': submission_uuid}
+
+        _logger.info("Consultando estado na AGT para submissionUUID %s em %s", submission_uuid, url)
+
+        try:
+            resp = requests.get(
+                url,
+                params=params,
+                headers={
+                    "Accept": "application/json",
+                },
+                auth=(username, password),
+                timeout=60,
+            )
+            resp.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            _logger.error("Erro de comunicação com a AGT ao consultar estado: %s", e)
+            raise UserError(_("Erro de comunicação com a AGT ao consultar estado: %s", e))
+
+        _logger.info("Resposta da AGT ao consultar estado: %s", resp.status_code)
+        _logger.debug("Corpo da resposta ao consultar estado: %s", resp.text)
+
+        if resp.status_code == 200:
+            return resp.json()
+        else:
+            try:
+                error_data = resp.json()
+                error_list = error_data.get("errorList", [])
+                error_msgs = [f"({e.get('idError')}) {e.get('descriptionError')}" for e in error_list]
+                raise UserError(_("A AGT retornou um erro ao consultar estado:\n%s", "\n".join(error_msgs)))
+            except json.JSONDecodeError:
+                raise UserError(_("A AGT retornou uma resposta inesperada ao consultar estado (HTTP %s): %s", resp.status_code, resp.text))
 
     def _send_to_agt(self, payload_json):
         """Envia o payload JSON para o endpoint da AGT."""

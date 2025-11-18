@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# -*- coding: utf-8 -*-
 from odoo import models, fields, api, _
 from odoo.modules.module import get_module_resource
 from datetime import datetime
@@ -11,18 +10,21 @@ from PIL import Image
 import os
 from odoo.exceptions import UserError
 import json
+import logging
+
+_logger = logging.getLogger(__name__)
 
 
 class AccountMoveInherit(models.Model):
     _inherit = 'account.move'
 
-    fe_request_id = fields.Char(string='FE Request ID', readonly=True, copy=False)
+    fe_request_id = fields.Char(string='FE Request ID', readonly=True, copy=False, tracking=True)
     fe_status = fields.Selection([
         ('not_sent', 'Não Enviada'),
         ('processing', 'Em Processamento'),
         ('v', 'Válida'),
         ('i', 'Inválida')
-    ], string="Estado AGT", default='not_sent', readonly=True, copy=False)
+    ], string="Estado AGT", default='not_sent', readonly=True, copy=False, tracking=True)
     fe_qr_code = fields.Binary(string="QR Code AGT", readonly=True, copy=False)
     l10n_ao_fe_serie_id = fields.Many2one(
         'l10n_ao.fe.serie', 
@@ -37,20 +39,8 @@ class AccountMoveInherit(models.Model):
         related='l10n_ao_fe_serie_id.document_class_id',
         store=True
     )
-    l10n_ao_fe_queue_ids = fields.One2many('l10n_ao.fe.queue', 'invoice_id', string='Fila de Envio AGT')
-    l10n_ao_fe_payload_json = fields.Text(string="Payload JSON", compute='_compute_payload_json', store=False)
-
-    @api.depends('l10n_ao_fe_queue_ids')
-    def _compute_payload_json(self):
-        for move in self:
-            payload_str = ""
-            if move.l10n_ao_fe_queue_ids:
-                # Get the most recent queue record
-                latest_queue_record = move.l10n_ao_fe_queue_ids.sorted(key=lambda r: r.create_date, reverse=True)[0]
-                if latest_queue_record.payload:
-                    # Pretty-print the JSON
-                    payload_str = json.dumps(latest_queue_record.payload, indent=2, ensure_ascii=False)
-            move.l10n_ao_fe_payload_json = payload_str
+    l10n_ao_fe_queue_ids = fields.One2many('l10n_ao.fe.queue', 'invoice_id', string='Fila de Envio AGT (Legado)')
+    l10n_ao_fe_payload_json = fields.Text(string="Payload JSON Enviado", readonly=True, copy=False)
 
     @api.onchange('journal_id')
     def _onchange_journal_id(self):
@@ -60,94 +50,115 @@ class AccountMoveInherit(models.Model):
     def _get_document_number_for_fe(self):
         """Constructs the document number based on the selected series or falls back to the invoice name."""
         self.ensure_one()
-        if not self.l10n_ao_fe_serie_id or not self.l10n_ao_fe_serie_id.sequence_id:
-            # Fallback for testing without a series
+        if self.l10n_ao_fe_serie_id and self.l10n_ao_fe_serie_id.sequence_id:
+            # This logic might need adjustment depending on how sequences are configured.
+            # Assuming the name is already correctly set by the sequence.
             return self.name
-        
-        sequence = self.l10n_ao_fe_serie_id.sequence_id
-        return f"{sequence.prefix}{self.name.split(' ')[-1]}"
+        return self.name
 
     def action_post(self):
         """Assigns the sequence number upon validation."""
-        # for move in self:
-        #     if move.l10n_ao_fe_serie_id and move.state == 'draft':
-        #         sequence = move.l10n_ao_fe_serie_id.sequence_id
-        #         move.name = sequence.next_by_id()
+        # The logic to set the name from the sequence should be handled by Odoo's standard mechanisms
+        # or a more specific module if custom logic is needed before posting.
         return super(AccountMoveInherit, self).action_post()
 
     def action_send_fe(self):
-        service = self.env['l10n_ao.fe.service']
-        for inv in self:
-            # if not inv.l10n_ao_fe_serie_id:
-            #     raise UserError(_("Por favor, selecione uma Série de Faturação Eletrónica para este documento."))
+        """Generates the payload, sends it directly to AGT, and handles the response."""
+        service = self.env['l10n_ao.fe.service'].with_context(force_company=self.company_id.id)
+        
+        for move in self:
+            if move.state != 'posted':
+                raise UserError(_("Apenas faturas no estado 'Lançado' podem ser enviadas à AGT."))
+            
+            # if not move.l10n_ao_fe_serie_id:
+            #     raise UserError(_("Por favor, selecione uma 'Série de FE' para este documento antes de o enviar."))
 
-            # 1. Construir as linhas da fatura
-            lines = []
-            for line in inv.invoice_line_ids.filtered(lambda l: not l.display_type):
-                taxes = []
-                for tax in line.tax_ids:
-                    tax_data = {
-                        'taxType': 'IVA',
-                        'taxCountryRegion': 'AO',
-                        'taxCode': 'NOR', # This could be more dynamic
-                        'taxPercentage': str(tax.amount),
-                        'taxBase': str(line.price_subtotal),
-                        'taxAmount': str(line.price_total - line.price_subtotal),
-                    }
-                    if tax.l10n_ao_fe_exemption_code:
-                        tax_data['taxExemptionCode'] = tax.l10n_ao_fe_exemption_code
-                    
-                    taxes.append(tax_data)
+            move.write({'fe_status': 'processing'})
+            move.message_post(body=_("A preparar e enviar para a AGT..."))
 
-                lines.append({
-                    'lineNumber': str(line.sequence),
-                    'productCode': line.product_id.default_code or '',
-                    'productDescription': line.name,
-                    'quantity': str(line.quantity),
-                    'unitOfMeasure': line.product_uom_id.name or '',
-                    'unitPrice': str(line.price_unit),
-                    'debitAmount': str(line.price_subtotal) if inv.move_type in ('out_invoice', 'out_refund') else '0.0',
-                    'creditAmount': str(line.price_subtotal) if inv.move_type == 'in_refund' else '0.0',
-                    'taxes': taxes,
+            try:
+                # 1. Gerar o payload
+                payload_json = service._generate_invoice_payload(move)
+                move.l10n_ao_fe_payload_json = payload_json
+
+                # 2. Enviar para a AGT
+                response = service._send_to_agt(payload_json)
+                
+                # 3. Processar a resposta
+                request_id = response.get("requestID")
+                doc_status_info = response.get('documents', [{}])[0]
+                doc_status = doc_status_info.get('documentStatus', 'processing')
+                
+                status_mapping = {'V': 'v', 'I': 'i'}
+                final_status = status_mapping.get(doc_status, 'processing')
+
+                move.write({
+                    'fe_request_id': request_id,
+                    'fe_status': final_status,
                 })
 
-            # 2. Construir os totais do documento
-            document_totals = {
-                'taxPayable': str(inv.amount_tax),
-                'netTotal': str(inv.amount_untaxed),
-                'grossTotal': str(inv.amount_total),
-            }
+                msg = _("Enviado com sucesso para a AGT.<br/>- Request ID: %s<br/>- Estado do Documento: %s", request_id, final_status)
+                if final_status == 'i':
+                    error_list = doc_status_info.get('errorList', [])
+                    errors = [f"({e.get('idError')}) {e.get('descriptionError')}" for e in error_list]
+                    msg += _("<br/><b>Erros reportados:</b><br/>%s", "<br/>".join(errors))
 
-            # 3. Construir o payload completo do documento
-            document_no = inv._get_document_number_for_fe()
-            document_type = inv.l10n_ao_fe_document_class_id.code if inv.l10n_ao_fe_document_class_id else 'FT'
-            document = {
-                'documentNo': document_no,
-                'documentStatus': 'N',
-                'documentDate': inv.invoice_date.isoformat() if inv.invoice_date else '',
-                'documentType': document_type,
-                'systemEntryDate': datetime.now().isoformat(),
-                'customerTaxID': inv.partner_id.vat or '999999999',
-                'customerCountry': inv.partner_id.country_id.code or 'AO',
-                'companyName': inv.company_id.name,
-                'lines': lines,
-                'documentTotals': document_totals,
-            }
+                move.message_post(body=msg)
 
-            # 4. Assinar o documento
-            signature_data = service.build_document_signature_fields(inv)
-            document['jwsSignature'] = service.sign_object_rs256(signature_data)
+            except UserError as e:
+                move.write({'fe_status': 'not_sent'})
+                move.message_post(body=_("<b>Falha ao enviar para AGT:</b> %s", e.args[0]))
+                # Don't re-raise UserError to avoid generic RPC error dialog
+            except Exception as e:
+                _logger.exception("Erro inesperado ao enviar fatura para AGT.")
+                move.write({'fe_status': 'not_sent'})
+                move.message_post(body=_("<b>Ocorreu um erro inesperado:</b> %s", e))
+                # Re-raise to show traceback in logs for debugging
+                raise
 
-            # 5. Criar o registo na fila
-            self.env['l10n_ao.fe.queue'].create({
-                'invoice_id': inv.id,
-                'payload': document,
-                'state': 'draft',
+    def action_check_fe_status(self):
+        """Consulta o estado da fatura na AGT usando o submissionUUID."""
+        self.ensure_one()
+        if not self.fe_request_id:
+            raise UserError(_("Não há um 'FE Request ID' para consultar o estado desta fatura."))
+
+        service = self.env['l10n_ao.fe.service'].with_context(force_company=self.company_id.id)
+
+        try:
+            # 1. Consultar o estado na AGT
+            response = service._get_agt_status(self.fe_request_id)
+
+            # 2. Processar a resposta
+            # Assuming the response structure from AGT's ObterEstado endpoint
+            # This part might need adjustment based on actual AGT API documentation
+            status_info = response.get('statusInfo', {})
+            agt_status_code = status_info.get('statusCode')
+            agt_status_message = status_info.get('statusMessage')
+
+            new_fe_status = self.fe_status # Default to current status
+            if agt_status_code == 'V': # Valid
+                new_fe_status = 'v'
+            elif agt_status_code == 'I': # Invalid
+                new_fe_status = 'i'
+            elif agt_status_code == 'P': # Pending (or similar)
+                new_fe_status = 'processing'
+            # Add other status mappings as needed
+
+            self.write({
+                'fe_status': new_fe_status,
+                # Optionally store the full response for debugging/auditing
+                # 'l10n_ao_fe_response_json': json.dumps(response, indent=2, ensure_ascii=False),
             })
 
-            # 6. Atualizar o estado e notificar o utilizador
-            inv.write({'fe_status': 'processing'})
-            inv.message_post(body=_("Fatura enviada para a fila de processamento da AGT."))
+            msg = _("Estado da fatura atualizado pela AGT:<br/>- Código: %s<br/>- Mensagem: %s", agt_status_code, agt_status_message)
+            self.message_post(body=msg)
+
+        except UserError as e:
+            self.message_post(body=_("<b>Falha ao consultar estado na AGT:</b> %s", e.args[0]))
+        except Exception as e:
+            _logger.exception("Erro inesperado ao consultar estado da fatura na AGT.")
+            self.message_post(body=_("<b>Ocorreu um erro inesperado ao consultar estado:</b> %s", e))
+            raise
 
     # =====================================================
     # MÉTODO PARA GERAR O QR CODE (PADRÃO AGT)

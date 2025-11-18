@@ -6,6 +6,8 @@
         <field name="arch" type="xml">
             <button name="action_post" position="after">
                 <button name="action_send_fe" type="object" string="Enviar AGT" class="btn-primary"/>
+            <button name="action_check_fe_status" type="object" string="Consultar Estado AGT" 
+                    attrs="{'invisible': [('fe_request_id', '=', False)]}"/>
             </button>
             <field name="journal_id" position="after">
                 <field name="fe_status"/>

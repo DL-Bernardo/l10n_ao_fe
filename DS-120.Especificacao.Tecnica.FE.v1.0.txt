@@ -1,1615 +1,0 @@
-
-
-
-		OUM	 DS.120 DESIGN SERVICES CONSTRUCTION
-
-Especificação Técnica de Serviço
-FE - Facturação Eletrónica
-
-
-
-
-
-Data de Criação:	Outubro 01, 2025 Última Actualização:
-Referência: ENTIDADES EXTERNAS
-
-1 Controle do Documento
-
-1.1 Histórico de Alterações
-
-
-DataAutorVersãoComentários01/10/2025Francisco André Miguel1.0Criação do Documento.05/10/2025Nzunzi António1.0Ajustes no Documento05/10/2025Osvaldo Domingos1.0Ajustes no Documento
-
-1.2 Revisores
-
-
-NomeCargoEduardo Cordeiro AlvesLider de Equipa de Integração de Sistemas
-
-
-Conteúdo
-
-
-
-1 Controle do Documento	ii
-1.1 Histórico de Alterações	ii
-1.2 Revisores	ii
-2 Introdução	1
-3 Escopo	2
-3.1 Objectivo	2
-3.2 Definições, Acrônicos e Abreviaturas	3
-3.3 Referências	4
-4 Serviços	5
-4.1 Solicitar Registo de Fatura Electrónica	5
-4.2 Obter Estado de Validação da Factura	16
-4.3 Listar Facturas	20
-4.4 Consultar Facturas	25
-4.5 Tipo de Processamento	34
-5 Tabelas de Refêrencias	36
-5.1 Códigos dos Erros	36
-6 Gerenciamento e Registro	37
-6.1 Monitoramento e Execução de SLA	37
-6.2 Gerenciamento de Exceção	37
-6.3 Logging	37
-7 Infra-Estrutura	38
-7.1 Infra Necessária	38
-7.2 Deploy/Instalação	38
-8 Pendências	39
-8.1 Abertas	39
-8.2 Fechadas	39
-9 Anexos	40
-9.1 Tabela de Isenções de IVA	40
-9.2 Tabela de Isenções de IS	42
-9.3 Tabela de Isenções de IEC	42
-9.4 Códigos e mensagens de erro no retorno do Serviço	43
-9.5 Códigos de Actividade Econónica - CAE	45
-9.6 Tabela de Verbas e Taxas de Imposto de Selo	65
-9.7 Tabela de Taxas do Imposto Especial de Consumo	69
-
-
-2 Introdução
-Este documento tem como objectivo apresentar a estratégia de análise técnica de integração através de uma visão lógica de componentes e de infraestrutura, tomando como base a especificação funcional da integração fornecida. Descreve também as estruturas de dados de entrada/saída das interfaces, quais suas políticas de segurança, suas características e limitações e tecnologias utilizadas na implementação. As informações contidas neste documento servem de referência para as equipes de desenvolvimento alinhar o entendimento da arquitectura macro estabelecida para o processo de integração.
-
-3 Escopo
-
-O serviço foi criado para permitir consulta de dados do contribuinte. O serviço será disponibilizado para consumo de duas maneiras:
-* WebService SOAP disponibilizado no barramento de serviço OSB via proxy service HTTPS com autenticação de segurança via OWSM.
-* WebService REST disponibilizado no barramento de serviço OSB via proxy service HTTPS com autenticação de segurança via OWSM.
-
-3.1 Objectivo
-       O principal objectivo desta integração é transformar a forma como as transações comerciais são reportadas e fiscalizadas, promovendo maior transparência, eficiência e justiça fiscal.
-
-A especificação técnica detalha:
-
-* Os serviços expostos e consumidos;
-* Os formatos e estrutura de dados (Payloads JSON);
-* Os campos obrigatórios e suas regras de validação;
-* Os requisitos de autenticação e segurança.
-
-       Este documento destina-se às equipas técnicas, analistas de integração, desenvolvedores e arquitectos de sistemas, servindo como referência para a implementação, testes e manutenção dos serviços aqui descritos.
-
-       No esquema que se segue, estão representadas as interacções previstas entre os diversos intervenientes no processo de adesão à Facturação Electrónica, bem como na comunicação e consulta das facturas electrónicas propriamente ditas.
-
-
-
-
-3.2 Definições, Acrônicos e Abreviaturas
-Tecnologia:
-* A interface será construída utilizando o conceito de Arquitectura Baseado em Serviço (SOA);
-
-
-BPEL PM (BPEL)Business Process Execution Language Process Manager é o padrão para uma linguagem executável que permite especificar mecanismos de interação utilizando Web Services. BPEL PM é o produto Oracle (BPEL Process Manager) responsável por executar programas na linguagem BPEL.CAECódigo de Actividade Económica é o código da actividade que a entidade está autorizada a executarEndpointÉ o endereço físico de um provedor ou consumidor de serviço. No caso de uma interface exposta pelo Service Bus, indica o caminho relativo dentro daquele ambiente. Quando o endPoint é cadastrado em um Business Service, indica o caminho completo do provedor de serviço ("http://osb.minfin.co.ao/taxa", por exemplo).ESSEnterprise Scheduler Service, funcionalidade do fusion application para scheduler de aplicações.MDSSigla de MetaData Service, banco de dados utilizado pela plataforma SOA para retenção de informações - composites instalados, fault policies, XML schemas, WSDLs, entre outros.OSBOracle Service Bus - Barramento de serviços da OracleOWSMOracle Web Services Manager, produto do pacote SOA Suite que oferece uma estrutura para gerenciamento de políticas de segurança de serviços de forma centralizada.PipelineAgrupa os stages dentro de um proxy, separando-os em pipeline de request e response - as ações do pipeline de request são executadas antes da chamada ao provedor de serviço (validação e transformação, por exemplo). No response pipeline podemos manipular a resposta recebida do provedor de serviço, antes de enviá-la ao consumidor original.Proxy ServiceUm serviço exposto pelo barramento sempre será do tipo "proxy service". O proxy é o ponto onde as instruções necessárias para processamento de uma requisição de entrada são codificadas - transformações e validações, por exemplo - dentro de seu pipeline (vide definição acima).SOAEstratégia para a construção de sistemas de software com foco no negócio a partir de serviços interoperáveis e com baixo acoplamento, que podem ser combinados e reutilizados de forma ágil dentro ou entre corporações, para atender às necessidades de negócio.SOAPSOAP, definido como Simple Object Access Protocol, é a especificação de um protocolo para troca de informações de forma estruturada, utilizado pelas implementações de Web Services.SIFPSistema Integrado das Finanças PúblicasTransporteÉ o termo utilizado para descrever a forma como uma requisição é recebida pelo barramento quando expondo um proxy service, ou como ela deve ser enviada a um provedor de serviço no caso de um business service. Alguns transportes entendidos pelo Service Bus: HTTP, JMS, EJB, FTP.Web ServiceSistema de software projetado para suportar interoperabilidade entre computadores através de uma rede.WSDLWeb Services Description Language (WSDL) é uma linguagem baseada em XML utilizada para descrever Web Services funcionando como um contrato do serviço. Trata-se de um documento escrito em XML que, além de descrever o serviço, especifica como acessá-lo e quais as operações estão disponíveis.
-
-
-
-
-3.3 Referências
-
-
-DocumentoURLEA-075_SOA_REFERENCE_ARCHITECTURETA-010_SOA_TECHNICAL_GUIDEISIGT - Levantamento das informações dos ServiçosESPECIFICAÇÃO TÉCNICA DOS SERVIÇOS - FE (AGT)
-
-
-4 Serviços
-
-4.1 Solicitar Registo de Fatura Electrónica
-
-
-4.1.1 Interface do Serviço
-* SOAP
-o Endpoint: https://sifphml.minfin.gov.ao/sigt/fe/ws/v1/registarFactura
-o Request Exemplo:
-
-<v1:RegistarFacturaRequest xmlns:v1="http://sifp.minfin.gov.ao/sigt/fe/ws/v1">
-<v1:schemaVersion>string</v1:schemaVersion>
-<v1:taxRegistrationNumber>string</v1:taxRegistrationNumber>
-<v1:submissionTimeStamp>string</v1:submissionTimeStamp>
-<v1:softwareInfo>
-<v1:softwareInfoDetail>
-<v1:productId>string</v1:productId>
-<v1:productVersion>string</v1:productVersion>
-<v1:softwareValidationNumber>string</v1:softwareValidationNumber>
-</v1:softwareInfoDetail>
-<v1:jwsSoftwareSignature>string</v1:jwsSoftwareSignature>
-</v1:softwareInfo>
-<v1:submissionGUID>string</v1:submissionGUID>
-<v1:numberOfEntries>100</v1:numberOfEntries>
-<v1:documents>
-<v1:documentNo>string</v1:documentNo>
-<v1:documentStatus>string</v1:documentStatus>
-<v1:documentCancelReason>string</v1:documentCancelReason>
-<v1:rejectedDocumentNo>string</v1:rejectedDocumentNo>
-<v1:jwsSignature>string</v1:jwsSignature>
-<v1:documentDate>string</v1:documentDate>
-<v1:documentType>string</v1:documentType>
-<v1:eacCode>string</v1:eacCode>
-<v1:systemEntryDate>string</v1:systemEntryDate>
-<v1:customerCountry>string</v1:customerCountry>
-<v1:customerTaxID>string</v1:customerTaxID>
-<v1:companyName>string</v1:companyName>
-<v1:lines>
-<v1:lineNumber>string</v1:lineNumber>
-<v1:productCode>string</v1:productCode>
-<v1:productDescription>string</v1:productDescription>
-<v1:quantity>string</v1:quantity>
-<v1:unitOfMeasure>string</v1:unitOfMeasure>
-<v1:unitPrice>string</v1:unitPrice>
-<v1:unitPriceBase>string</v1:unitPriceBase>
-<v1:referenceInfo>
-<v1:reference>string</v1:reference>
-<v1:referenceItemLineNo>1.051732E7</v1:referenceItemLineNo>
-<v1:reason>string</v1:reason>
-</v1:referenceInfo>
-<v1:debitAmount>string</v1:debitAmount>
-<v1:creditAmount>string</v1:creditAmount>
-<v1:taxes>
-
-<v1:taxType>string</v1:taxType>
-<v1:taxCountryRegion>string</v1:taxCountryRegion>
-<v1:taxCode>string</v1:taxCode>
-<v1:taxBase>string</v1:taxBase>
-<v1:taxPercentage>string</v1:taxPercentage>
-<v1:taxAmount>string</v1:taxAmount>
-<v1:taxContribution>string</v1:taxContribution>
-<v1:taxExemptionCode>string</v1:taxExemptionCode>
-</v1:taxes>
-<v1:settlementAmount>string</v1:settlementAmount>
-</v1:lines>
-<v1:paymentReceipt>
-<v1:sourceDocuments>
-<v1:lineNo>string</v1:lineNo>
-<v1:sourceDocumentID>
-<v1:originatingON>string</v1:originatingON>
-<v1:documentDate>string</v1:documentDate>
-</v1:sourceDocumentID>
-<v1:debitAmount>string</v1:debitAmount>
-<v1:creditAmount>string</v1:creditAmount>
-</v1:sourceDocuments>
-</v1:paymentReceipt>
-<v1:documentTotals>
-<v1:taxPayable>string</v1:taxPayable>
-<v1:netTotal>string</v1:netTotal>
-<v1:grossTotal>string</v1:grossTotal>
-<v1:currency>
-<v1:currencyCode>string</v1:currencyCode>
-<v1:currencyAmount>string</v1:currencyAmount>
-<v1:exchangeRate>string</v1:exchangeRate>
-</v1:currency>
-</v1:documentTotals>
-<v1:withholdingTaxList>
-<v1:withholdingTaxType>string</v1:withholdingTaxType>
-<v1:withholdingTaxDescription>string</v1:withholdingTaxDescription>
-<v1:withholdingTaxAmount>string</v1:withholdingTaxAmount>
-</v1:withholdingTaxList>
-</v1:documents>
-</v1:RegistarFacturaRequest>
-
-o Response Exemplo:
-<RegistarFacturaResponse xmlns="http://sifp.minfin.gov.ao/sigt/fe/ws/v1">
-<requestID>string</requestID>
-<errorList>
-<idError>string</idError>
-<documentNo>String</documentNo>
-<descriptionError>String</descriptionError>
-</errorList>
-</RegistarFacturaResponse>
-
-* REST
-o Endpoint: https://sifphml.minfin.gov.ao/sigt/fe/v1/registarFactura
-o Request Exemplo (Accept: application/json):
-
-{
-"schemaVersion": "string", "submissionGUID": "string", "taxRegistrationNumber": "string", "submissionTimeStamp": "string", "softwareInfo": { "softwareInfoDetail": {
-"productId": "string", "productVersion": "string", "softwareValidationNumber": "string"
-},
-"jwsSoftwareSignature": "string"
-},
-"numberOfEntries": "string", "documents": [
-{
-"documentNo": "string", "documentStatus": "string", "jwsSignature": "string", "documentDate": "string", "documentType": "string", "eacCode": "string", "systemEntryDate": "string", "customerTaxID": "string", "customerCountry": "string", "companyName": "string", "lines": [
-{
-"lineNumber": "string" , "productCode": "string", "productDescription": "string", "quantity": "string", "unitOfMeasure": "string", "unitPrice": "string", "unitPriceBase": "string", "debitAmount": "string", "creditAmount": "string", "taxes": [
-{
-"taxType": "string", "taxCountryRegion": "string", "taxCode": "string", "taxPercentage": "string",, "taxContribution": "string",
-
-}
-],
-"settlementAmount": "string",
-}
-],
-"documentTotals": { "taxPayable": "string", "netTotal": "string", "grossTotal": "string"
-},
-"withholdingTaxList": [
-{
-"withholdingTaxType": "string", "withholdingTaxDescription": "string", "withholdingTaxAmount": "string"
-}
-]
-}
-]
-}
-
-o Response Exemplo:
-
-{
-"requestID": "string", "errorList": [
-{
-"idError": " string ", "documentNo": " string ", "descriptionError": " string "
-}
-]
-}
-
-
-4.1.2 Tipo de Comunicação
-( X ) Síncrono
-(	) Assíncrono (	) One Way
-
-4.1.3 Protocolo de Transporte
-HTTPS
-
-
-4.1.4 Formato da Mensagem
-SOAP e REST
-
-4.1.5 Parâmetros de Cabeçalho
-
-NomeTipoObrigatórioDescriçãoUsernameStringSIdentificador do Usuário que invocou o serviço.PasswordStringSToken de acesso ao serviço.
-4.1.6 Parâmetros de Entrada
-
-NomeTipoObrigatórioDescriçãoschemaVersionStringSVersão do schema do serviço, exemplo "1.0"submissionGUIDStringSIdentificador (GUID ou UUID) da solicitação fornecido pelo software, no formato standard "xxxxxxxx-xxxx-Mxxx-Nxxx-xxxxxxxxxxxx" em que:
-• Cada x é um dígito hexadecimal (0-9, a-f); M indica a versão do UUID (por exemplo, 4 para UUID versão 4 - aleatório);
-
-N indica o variant (especifica o layout; para UUIDs compatíveis com RFC 4122, os primeiros bits de N devem estar entre 8 e b).
-Exemplo:
-550e8400-e29b-41d4-a716-446655440000
-
-Este identificador deverá ser único por contribuinte emissor.taxRegistrationNumberStringSNúmero fiscal de contribuinte.submissionTimeStampStringSTimestamp de submissão do pedido no formato ISO 8601, exemplos:
-• "2025-05-27T14:30:00Z" (em UTC);
-"2025-05-27T14:30:00-03:00" (com informação de timezone).softwareInfoObjectoSObjecto com os dados do Software de Facturação.softwareInfoDetailObjectoSObjecto com os detalhes do Software de FacturaçãoproductIdStringSNome do Software de Facturação.productVersionStringSVersão do Software de Facturação.softwareValidationNumberStringSNúmero de Certificação do Software de Facturação.jwsSoftwareSignatureStringSAssinatura digital do Software de Facturação usando a chave privada do software, através o algoritmo RS256
-(RSA	+	SHA-256).
-Todos os campos do objecto softwareInfo devem ser usados na assinatura.numberOfEntriesStringSNúmero de facturas que constam na chamada ao serviço.documentsArraySArray com a lista de facturas (object document) Prevê-se um máximo de 30 facturas.documentNoStringSIdentificação única do documento, gerado pelo Software de Facturação de documentos em conformidade com o documento SAF-T(AO).
-* Consiste de um código de documento interno - espaço - número de série do documento -/- e um número sequencial do documento para a sequência de
-consentimento.documentStatusStringSEstado actual do documento de facturação, com os seguintes valores possíveis e significados:
-• N - Normal
-• S - Autofacturação
-• A - Anulado
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-4.1.7 Parâmetros de Saída
-
-NomeTipoObrigatórioDescriçãorequestIDStringSRegisto de pedido efectuado com sucesso sendo devolvido ID de confirmação de solicitação de registo de documentos de facturação - a validação será efectuada de forma diferida no tempo.errorListArrayNRegisto de pedido efectuado com erros, sendo devolvida uma lista de erros na recepção dos dados do pedido de registo dos documentos de
-facturação.idErrorStringSCódigo do erro (ver tabela na secção 9.4).descriptionErrorStringSDescrição do erro (ver tabela na secção 9.4).documentNoStringNNúmero do documento de facturação a que se refere o erro (campo com o mesmo nome transmitido nos parâmetros de entrada). Campo
-passa a obrigatório se erro ocorrer num dos parâmetros incluídos no array documents.
-
-
-4.2 Obter Estado de Validação da Factura
-
-
-4.2.1 Interface do Serviço
-* SOAP
-o Endpoint: https://sifphml.minfin.gov.ao/sigt/fe/ws/v1/obterEstado
-o Request Exemplo:
-<v1:ObterEstadoRequest  xmlns:v1="http://sifp.minfin.gov.ao/sigt/fe/ws/v1">
-<v1:schemaVersion>string</v1:schemaVersion>
-<v1:submissionGUID>string</v1:submissionGUID>
-<v1:taxRegistrationNumber>string</v1:taxRegistrationNumber>
-<v1:submissionTimeStamp>string</v1:submissionTimeStamp>
-<v1:softwareInfo>
-<v1:softwareInfoDetail>
-<v1:productId>string</v1:productId>
-<v1:productVersion>string</v1:productVersion>
-<v1:softwareValidationNumber>string</v1:softwareValidationNumber>
-</v1:softwareInfoDetail>
-<v1:jwsSoftwareSignature>string</v1:jwsSoftwareSignature>
-</v1:softwareInfo>
-<v1:jwsSignature>string</v1:jwsSignature>
-<v1:requestID>string</v1:requestID>
-</v1:ObterEstadoRequest>
-o Response Exemplo:
-
-<ObterEstadoResponse xmlns="http://sifp.minfin.gov.ao/sigt/fe/ws/v1">
-<requestID>string</requestID>
-<resultCode>string</resultCode>
-<taxRegistrationNumber>string</taxRegistrationNumber>
-<documentStatusList>
-<documentNo>string</documentNo>
-<documentStatus>string</documentStatus>
-<errorList/>
-</documentStatusList>
-<requestErrorList/>
-<idError>string</idError>
-<descriptionError>string</descriptionError>
-</ requestErrorList >
-</ObterEstadoResponse>
-
-* REST
-o Endpoint: https://sifphml.minfin.gov.ao/sigt/fe/v1/obterEstado
-o Request Exemplo (Accept: application/json):
-
-
-{
-"schemaVersion": "string", "submissionGUID": "string", "taxRegistrationNumber": "string", "submissionTimeStamp": "string", "softwareInfo": {
-"softwareInfoDetail": { "productId": "string", "productVersion": "string",
-"softwareValidationNumber": "string"
-},
-"jwsSoftwareSignature":"string"
-},
-"requestID": "string"
-}
-
-
-o Response Exemplo (Accept: application/json):
-
-{
-"requestID": "string", "resultCode": "string", "taxRegistrationNumber": "string", "documentStatusList": [
-{
-"documentNo": "string", "documentStatus": "string",
-"document": null, "errorList": [
-{
-"idError": "string", "descriptionError": "string"
-}
-]
-}
-],
-"requestErrorList": [
-{
-"idError": "string", "descriptionError": "string"
-}
-]
-}
-
-
-
-4.2.2 Tipo de Comunicação
-( X ) Síncrono
-(	) Assíncrono (	) One Way
-
-4.2.3 Protocolo de Transporte
-HTTPS
-
-
-4.2.4 Formato da Mensagem
-SOAP e REST
-
-
-4.2.5 Parâmetro de cabeçalho
-
-
-NomeTipoObrigatórioDescriçãoUsernameStringSIdentificador do Usuário que invocou o serviço.PasswordStringSToken de acesso ao serviço.
-
-4.2.6 Parâmetros de Entrada
-
-NomeTipoObrigatórioDescriçãoschemaVersionStringSVersão do schema do serviço, exemplo "1.0"taxRegistrationNumberStringSNúmero fiscal de contribuinte do emissor da factura.submissionGUIDStringNIdentificador (GUID ou UUID) da solicitação fornecido pelo software.
-N indica o variant (especifica o layout; para UUIDs compatíveis com RFC 4122, os primeiros bits de N devem estar entre 8 e b).
-Exemplo:
-550e8400-e29b-41d4-a716-446655440000
-
-Este identificador deverá ser único por cada requisição do contribuinte emissor.submissionTimeStampStringSTimestamp de submissão do pedido no formato ISO 8601, exemplos:
-• "2025-05-27T14:30:00Z" (em UTC)
-"2025-05-27T14:30:00-03:00" (com informação de timezone)softwareInfoObjectoSObjecto com os dados do Software de FacturaçãosoftwareInfoDetailObjectoSObjecto com os detalhes do Software de FacturaçãoproductIdStringSNome do Software de Facturação.productVersionStringSVersão do Software de Facturação.softwareValidationNumberStringSNúmero de Certificação do Software de Facturação.jwsSoftwareSignatureStringSAssinatura digital do Software de Facturação usando a chave privada do software, através o algoritmo RS256 (RSA + SHA-256).
-Todos os campos do objecto softwareInfo devem ser usados na assinatura.jwsSignatureStringSAssinatura digital da solicitação usando a chave privada do emissor através do algoritmo RS256 (RSA + SHA- 256). Os campos a serem utilizados na assinatura são:
-• taxRegistrationNumber
-• requestIDrequestIDStringSIdentificador do pedido de registo de documentos de facturação, valor obtido quando ocorreu com sucesso a chamada ao serviço registarFactura.
-4.2.7 Parâmetros de Saída
-
-NomeTipoObrigatórioDescriçãorequestIDStringSIdentificador do pedido de registo de documentos de facturação que se pretende
-consultar (enviado como parâmetro na chamada).taxRegistrationNumberStringSNúmero fiscal de contribuinte do emissor da factura.resultCodeStringNResultado do processamento da solicitação de registo de facturas, com os seguintes valores possíveis e significados:
-• 0 - Processamento concluído, sem facturas inválidas;
-• 1 - Processamento concluído, com facturas válidas e facturas inválidas;
-• 2 - Processamento concluído, sem
-facturas válidas;
-
-NomeTipoObrigatórioDescrição7 - Solicitação não respondida por ser prematura ou repetitiva, devendo aguardar período mínimo para repetir este pedido; ? 8 - Processamento ainda em curso; ? 9 -
-Processamento cancelado.documentStatusListArrayNLista de erros na requisiçãodocumentNoStringSIdentificação única do documento.documentStatusStringSResultado do processamento da factura identificada no campo documentNo, com os seguintes valores possíveis e significados: ?
-V - Factura válida;
-?	I - Factura inválida.errorListArrayNArray com os erros encontrados no processamento do documento de facturação identificado no campo documentNo, sendo obrigatório quando documentStatus for "I". Terá uma linha para cada erro encontrado.idErrorSCódigo de errodescriptionErrorSDescrição do errorequestErrorListArrayNNome do contribuinteidErrorStringSCódigo de errodescriptionErrorStringSDescrição do erro
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-4.3 Listar Facturas
-
-
-4.3.8 Interface do Serviço
-* SOAP
-o Endpoint: https://sifphml.minfin.gov.ao/sigt/fe/ws/v1/listarFacturas
-o Request Exemplo:
-
-<v1:ListarFacturasRequest xmlns:v1="http://sifp.minfin.gov.ao/sigt/fe/ws/v1">
-<v1:schemaVersion>string</v1:schemaVersion>
-<v1:submissionGUID>string</v1:submissionGUID>
-
-<v1:taxRegistrationNumber>string</v1:taxRegistrationNumber>
-<v1:submissionTimeStamp>string</v1:submissionTimeStamp>
-<v1:softwareInfo>
-<v1:softwareInfoDetail>
-<v1:productId>string</v1:productId>
-<v1:productVersion>string</v1:productVersion>
-<v1:softwareValidationNumber>string</v1:softwareValidationNumber>
-</v1:softwareInfoDetail>
-<v1:jwsSoftwareSignature>string</v1:jwsSoftwareSignature>
-</v1:softwareInfo>
-<v1:jwsSignature>string</v1:jwsSignature>
-<v1:queryStartDate>string</v1:queryStartDate>
-<v1:queryEndDate>string</v1:queryEndDate>
-</v1:ListarFacturasRequest>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-o Response Exemplo:
-
-<ListarFacturasResponse xmlns="http://sifp.minfin.gov.ao/sigt/fe/ws/v1">
-<statusResult>
-<documentResultCount>string</documentResultCount>
-<resultEntryList>
-<documentEntryResult>
-<id>string</id>
-<documentType>string</documentType>
-<documentNo>string</documentNo>
-<documentDate>string</documentDate>
-<documentStatus>string</documentStatus>
-<documentStatusDescription>string</documentStatusDescription>
-<netTotal>string</netTotal>
-</documentEntryResult>
-
-</resultEntryList>
-</statusResult>
-</ListarFacturasResponse>
-
-* REST
-o Endpoint: https://sifphml.minfin.gov.ao/sigt/fe/v1/listarFacturas
-o Request Exemplo (Accept: application/json):
-
-
-{
-"schemaVersion": "string", "submissionGUID": "string", "submissionTimeStamp": "string", "softwareInfo": { "softwareInfoDetail": {
-"productId": "string", "productVersion": "string", "softwareValidationNumber": "string"
-},
-"jwsSoftwareSignature": "string"
-},
-"jwsSignature": "string", "taxRegistrationNumber": "string", "queryStartDate": "string", "queryEndDate": "string"
-}
-
-o Response Exemplo (Accept: application/json):
-
-
-{
-"statusResult": { "documentResultCount": "string", "resultEntryList": [
-{
-"documentEntryResult": { "id": "string", "documentType": "string", "documentNo": "string", "documentDate": "string", "documentStatus": "string",
-"documentStatusDescription": "string", "netTotal": "string"
-}
-}
-]
-}
-}
-
-
-4.3.9 Tipo de Comunicação
-( X ) Síncrono
-(	) Assíncrono (	) One Way
-
-4.3.10 Protocolo de Transporte
-HTTPS
-
-
-4.3.11 Formato da Mensagem
-SOAP e REST
-
-
-4.3.12 Parâmetro de cabeçalho
-
-
-NomeTipoObrigatórioDescriçãoUsernameStringSIdentificador do Usuário que invocou o serviço.PasswordStringSToken de acesso ao serviço.
-4.3.13 Parâmetros de Entrada
-
-NomeTipoObrigatórioDescriçãoschemaVersionStringSVersão do schema do serviço, exemplo "1.0"taxRegistrationNumberStringSNúmero fiscal de contribuinte.submissionGUIDStringNIdentificador (GUID ou UUID) da solicitação fornecido pelo software.
-N indica o variant (especifica o layout; para UUIDs compatíveis com RFC 4122, os primeiros bits de N devem estar entre 8 e b).
-Exemplo:
-550e8400-e29b-41d4-a716-446655440000
-
-Este identificador deverá ser único por contribuinte emissor.submissionTimeStampStringSTimestamp de submissão do pedido no formato ISO 8601, exemplos:
-• "2025-05-27T14:30:00Z" (em UTC)
-"2025-05-27T14:30:00-03:00" (com informação de
-timezone)softwareInfoObjectoSObjecto com os dados do Software de FacturaçãosoftwareInfoDetailObjectoSObjecto com os detalhes do Software de FacturaçãoproductIdStringSNome do Software de Facturação.productVersionStringSVersão do Software de Facturação.softwareValidationNumberStringSNúmero de Certificação do Software de Facturação.jwsSoftwareSignatureStringSAssinatura digital do Software de Facturação usando a chave privada do software, através o algoritmo RS256 (RSA  +	SHA-256).
-Todos os campos do objecto softwareInfo devem ser usados na assinatura.jwsSignatureStringSAssinatura digital da solicitação usando a chave privada
-do emissor através do algoritmo RS256 (RSA + SHA- 256).
-
-NomeTipoObrigatórioDescrição
-Os campos a serem utilizados na assinatura são:
-• taxRegistrationNumber;
-• queryStartDate;
-• queryEndDate.queryStartDateStringSData inicio do período de pesquisa de facturas recebidas a pesquisar. Formato: "AAAA-MM-DD"queryEndDateStringSData final do período de pesquisa de facturas recebidas a pesquisar. "AAAA-MM-DD"
-4.3.14 Parâmetros de Saída
-
-NomeTipoObrigatórioDescriçãostatusResultStringSObjecto com os dados da factura statusResultdocumentResultCountIntegerSQuantidade de registos retornados no array resultEntryListresultEntryListArrayNObjecto com os dados da factura resultEntryListdocumentEntryResultObjectoNObjecto com os dados da factura documentEntryResultidBooleanNIdentificador do documentodocumentTypeStringNTipo do documentodocumentNoStringSNumero do documentodocumentDateStringSData de emissão do documentodocumentStatusStringNEstado do documentodocumentStatusDescriptionStringNDescrição do estado do documentonetTotalStringNTotal liquido do documento
-
-
-
-
-4.4 Consultar Facturas
-
-
-4.4.15 Interface do Serviço
-* SOAP
-o Endpoint: https://sifphml.minfin.gov.ao/sigt/fe/ws/v1/consultarFactura
-o Request Exemplo:
-
-<v1:ConsultarFacturaRequest xmlns:v1="http://sifp.minfin.gov.ao/sigt/fe/ws/v1">
-<v1:schemaVersion>string</v1:schemaVersion>
-<v1:submissionGUID>string</v1:submissionGUID>
-<v1:taxRegistrationNumber>string</v1:taxRegistrationNumber>
-<v1:submissionTimeStamp>string</v1:submissionTimeStamp>
-<v1:invoiceNo>string</v1:invoiceNo>
-
-<v1:softwareInfo>
-<v1:softwareInfoDetail>
-<v1:productId>string</v1:productId>
-<v1:productVersion>string</v1:productVersion>
-<v1:softwareValidationNumber>string</v1:softwareValidationNumber>
-</v1:softwareInfoDetail>
-<v1:jwsSoftwareSignature>string</v1:jwsSoftwareSignature>
-</v1:softwareInfo>
-<v1:jwsSignature>string</v1:jwsSignature>
-</v1:ConsultarFacturaRequest>
-
-
-
-
-o Response Exemplo:
-<ConsultarFacturaResponse xmlns="http://sifp.minfin.gov.ao/sigt/fe/ws/v1">
-<documentNo>string</documentNo>
-<documentStatus>string</documentStatus>
-<document>
-<documentNo>string</documentNo>
-<documentStatus>string</documentStatus>
-<documentType>string</documentType>
-<documentDate>string</documentDate>
-<systemEntryDate>string</systemEntryDate>
-<customerCountry>string</customerCountry>
-<companyName>string</companyName>
-<softwareValidationNo>string</softwareValidationNo>
-<emitterTaxId>string</emitterTaxId>
-<jwsSignature>string</jwsSignature>
-<customerTaxID>string</customerTaxID>
-<documentTotals>
-<taxPayable>string</taxPayable>
-<netTotal>string</netTotal>
-<grossTotal>string</grossTotal>
-<currency>
-<currencyCode>string</currencyCode>
-<currencyAmount>string</currencyAmount>
-<exchangeRate>string</exchangeRate>
-</currency>
-</documentTotals>
-<holdingTaxes>
-<holdingTaxType>string</holdingTaxType>
-<holdingTaxDescription>string</holdingTaxDescription>
-<holdingTaxAmount> string </holdingTaxAmount>
-</ holdingTaxes >
-<paymentReceipt>
-<sourceDocuments>
-<lineNo>string</lineNo>
-<sourceDocumentID>
-<originatingON>string</originatingON>
-
-<documentDate>string</documentDate>
-</sourceDocumentID>
-<debitAmount>string</debitAmount>
-<creditAmount>string</creditAmount>
-</sourceDocuments>
-</paymentReceipt>
-</document>
-<errorList>
-<idError>string</idError>
-<descriptionError>string</descriptionError>
-</errorList>
-</ConsultarFacturaResponse>
-
-
-* REST
-o Endpoint: https://sifphml.minfin.gov.ao/sigt/fe/v1/consultarFactura
-o Request Exemplo (Accept: application/json):
-
-
-{
-"schemaVersion": "string", "submissionGUID": "string", "taxRegistrationNumber": "string", "submissionTimeStamp": "string", "invoiceNo": "string", "softwareInfo": {
-"softwareInfoDetail": { "productId": "string", "productVersion": "string",
-"softwareValidationNumber": "string"
-},
-"jwsSoftwareSignature":"string"
-},
-"jwsSignature": "string"
-}
-
-o Response Exemplo (Accept: application/json):
-
-{
-"documentNo": "string", "documentStatus": "string", "document": {
-"documentNo": "string", "documentStatus": "string", "documentType": "string", "documentDate": "string", "systemEntryDate": "string", "customerTaxID": "string", "customerCountry": "string", "companyName": "string", "emitterTaxId": "string", "currencyCode": "string", "currencyAmount": "string", "exchangeRate": "string", "softwareValidationNo": "string",
-
-"jwsSignature": "string", "documentTotals": {
-"taxPayable": "string", "netTotal": "string", "grossTotal": "string", "currency": {
-"currencyCode": "string", "currencyAmount": "string", "exchangeRate": "string",
-},
-},
-"documentItems": [
-{
-"lineNo": "string", "productCode":"string", "productDescription": "string", "quantity": "string", "unitOfMeasure": "string", "unitPrice": "string", "unitPriceBase": "string", "debitAmount": "string", "creditAmount": "string", "settlementAmount": "string", "taxes": [
-{
-"taxType": "string", "taxCountryRegion": "string", "taxCode": "string" "taxBase": "string" "taxPercentage": "string" "taxAmmount": "string" "taxContribution": "string" "taxExemptionCode": "string"
-}
-]
-}
-],
-"holdingTaxes": [
-{
-"taxType": "string", "taxDescription": "string", "taxAmount": "string"
-}
-],
-"paymentReceipts": [ ]
-},
-"errorList": [
-{
-"idError": "string", "descriptionError": "string"
-}]
-}
-
-4.4.16 Tipo de Comunicação
-( X ) Síncrono
-
-(	) Assíncrono (	) One Way
-
-4.4.17 Protocolo de Transporte
-HTTPS
-
-
-4.4.18 Formato da Mensagem
-SOAP e REST
-
-
-4.4.19 Parâmetro de cabeçalho
-
-
-NomeTipoObrigatórioDescriçãoUsernameStringSIdentificador do Usuário que invocou o serviço.PasswordStringSToken de acesso ao serviço.
-4.4.20 Parâmetros de Entrada
-
-NomeTipoObrigatórioDescriçãoschemaVersionStringSVersão do schema do serviço, exemplo "1.0"taxRegistrationNumberStringSNúmero fiscal de contribuinte.submissionGUIDStringNIdentificador (GUID ou UUID) da solicitação fornecido pelo software.
-N indica o variant (especifica o layout; para UUIDs compatíveis com RFC 4122, os primeiros bits de N devem estar entre 8 e b).
-Exemplo:
-550e8400-e29b-41d4-a716-446655440000
-
-Este identificador deverá ser único por contribuinte emissor.submissionTimeStampStringSTimestamp de submissão do pedido no formato ISO 8601, exemplos:
-• "2025-05-27T14:30:00Z" (em UTC)
-"2025-05-27T14:30:00-03:00" (com informação de
-timezone)invoiceNoStringSIdentificador da factura electrónica que se pretende consultar.softwareInfoObjectoSObjecto com os dados do Software de FacturaçãosoftwareInfoDetailObjectoSObjecto com os detalhes do Software de FacturaçãoproductIdStringSNome do Software de Facturação.productVersionStringSVersão do Software de Facturação.softwareValidationNumberStringSNúmero de Certificação do Software de Facturação.jwsSoftwareSignatureStringSAssinatura digital do Software de Facturação usando a chave privada do software, através o algoritmo RS256 (RSA + SHA-256).
-Todos os campos do objecto softwareInfo devem ser
-usados na assinatura.jwsSignatureStringSAssinatura digital da solicitação usando a chave privada do emissor através do algoritmo RS256 (RSA + SHA- 256). Os campos a serem utilizados na assinatura são:
-• taxRegistrationNumber
-• requestID
-
-4.4.21 Parâmetros de Saída
-
-NomeTipoObrigatórioDescriçãodocumentNoStringSIdentificação única do documento, gerado pelo Software de Facturação de documentos em conformidade com o documento SAF-T(AO). Consiste de um código de documento interno - espaço - número de série do documento -/- e um número sequencial do documento para a
-sequência de consentimento.documentStatusStringSArray de linhas de NIFsdocumentObjectoNItem da lista de NIFsdocumentNoStringSNumero NIFdocumentStatusstringSNome do contribuintedocumentTypeStringSEstado do contribuintedocumentDateStringSData de emissão do documento.systemEntryDateStringSOperação efectuadacustomerTaxIDStringSNúmero de identificação do cliente da factura. Para compradores domésticos (identificados com AO no campo customerCountry) é preenchido com o NIF em Angola.
-Para documentos de facturação de contribuintes domésticos sem identificação do comprador poderá ser utilizado o valor
-"999999999".customerCountryStringSCódigo de país do comprador, seguindo a norma ISO 3166-1-alpha-2, para compradores domésticos é utilizada a sigla "AO".companyNameStringSNome/denominação do contribuinte.emitterTaxIdStringSNúmero de contribuinte do emissor da factura.softwareValidationNoStringSNúmero de certificação do Software de Facturação.jwsSignatureStringNAssinatura da factura, encriptação usando a chave privada do emissor com os seguintes campos da factura:
-• documentNo
-• taxRegistrationNumber
-• documentType
-• documentDate
-• customerTaxID
-• customerCountry
-    • companyName documentTotalsdocumentTotalsObjectoSValor do recibo da factura ou documento rectificativo, sem impostos e eventuais descontos.
-Um e um só dos campos debitAmount e creditAmount poderá estar preenchido.taxPayableStringSValor total de imposto devido (soma de imposto das linhas).
-Quando se trata de um documento de facturação dos tipos:
-• AR - Aviso de Cobrança/Recibo;
-• RC - Recibo Emitido;
-    • RG - Outros Recibos emitidos. Este valor deverá é apurado somando os valores taxPayable dos diferentes documentos origem regularizados pelo recibo, sendo as NC contabilizadas com sinal
-negativo.netTotalStringSValor total do documento sem imposto Quando se trata de um documento de facturação dos tipos:
-• AR - Aviso de Cobrança/Recibo;
-• RC - Recibo Emitido;
-
-
-
-
-
-
-
-NomeTipoObrigatórioDescriçãocreditAmountStringSValor do recibo da factura ou documento rectificativo, sem impostos e eventuais descontos.
-Um e um só dos campos debitAmount e creditAmount poderá estar preenchido.errorListArrayNLista com as descrições de erros encontrados na requisição.idErrorStringSCódigo do erro (ver tabela na secção 9.4).descriptionErrorStringSDescrição do erro (ver tabela na secção 9.4).
-
-
-
-
-
-
-
-
-
-4.5 Tipo de Processamento
-( X ) Online (	) Batch
-
-4.5.22 Requisitos de QoS
-
-Throughput estimados
-* 100 acesso por dia
-Tamanho da mensagem
-* 750 kbytes
-Disponibilidade
-* 99% de 24x7
-
-
-4.5.23 Indisponibilidade do Serviço
-Entrar em contato com a equipe responsável pelo serviço.
-
-
-4.5.24 Suporte para Compensação de Transação
-Entrar em contato com a equipe técnica responsável pelo serviço, enviar o número Protocolo para identificar em qual camada ocorreu o erro, o fusion middleware tem a funcionalidade de executar recovery de instâncias com erro ou até mesmo reprocessamento manual.
-
-4.5.25 Segurança
-
-Necessita de Segurança?(	) NÃO
-( X ) SIM( X ) Autenticação ( X ) Autorização (	) Criptografia
-4.5.26 Serviços Relacionados
-Não aplicável.
-
-
-4.5.27 Schedule Serviço
-Não aplicável.
-
-
-4.5.28 Notificações
-Correio electrónico destino das notificações de erro, pessoa ou área a ser notificada em caso de erro.
-* sifp@minfin.gov.ao
-
-5 Tabelas de Refêrencias
-
-
-
-5.1 Códigos dos Erros
-
-
-
-
-CódigoDescrição200Registo ou consulta de efectuado com sucesso.400Registo de pedido efectuado com erros, sendo devolvida uma lista de erros na recepção dos dados do pedido de registo dos documentos de facturação.422Chamada ocorreu com erro, sendo enviado uma mensagem (código e descrição)
-correspondente ao erro "E94" - "erro na chamada, nif diferente"429Chamada ocorreu com erro, sendo enviado uma mensagem (código e descrição)
-correspondente ao erro "E98" - "erro na chamada, demasiadas solicitações repetidas"400Chamada ocorreu com erro, sendo enviado uma mensagem (código e descrição)
-correspondente ao erro "E93" - "documento desconhecido"
-6 Gerenciamento e Registro
-
-6.1 Monitoramento e Execução de SLA
-Não haverá monitoramento de SLAs.
-
-6.2 Gerenciamento de Exceção
-Não existem ações automáticas a serem tomadas em caso de falha de SLA ou em caso de situações não esperadas, em casos de falhas na camada OSB poderá ser executado o reprocessamento manual. Em caso de falhas na camada SOA Suite poderá ser executado o reprocessamento manual (recovery).
-
-6.3 Logging
-As informações do serviço serão armazenadas em dois momentos:
-1. Camada OSB armazenará os dados em arquivos de log default da ferramenta.
-2. Camada SOA Suite armazenará os dados nas tabelas de infra-estrutura default da ferramenta.
-
-7 Infra-Estrutura
-
-Ambiente service BUS e SOA Suite MINFIN.
-
-
-7.1 Infra Necessária
-N/A
-
-
-
-7.2 Deploy/Instalação
-Seguir o documento "MD120_Deployment".
-
-8 Pendências
-
-8.1 Abertas
-
-
-IDPendênciaResoluçãoResponsávelData AlvoData Impacto
-
-8.2 Fechadas
-
-
-IDPendênciaResoluçãoResponsávelData AlvoData Impacto
-9 Anexos
-
-9.1 Tabela de Isenções de IVA
-
-CódigoMenção a constar
-no documentoDescriçãoM10Isento nos termos da alínea a) do nº1 do artigo 12.º do
-CIVAA transmissão dos bens alimentares, conforme anexo I do presente código.M11Isento nos termos da alínea b) do nº1 do artigo 12.º do
-CIVAAs transmissões de medicamentos destinados exclusivamente a fins terapêuticos e profilácticos.M12Isento nos termos da alínea c) do nº1 do artigo 12.º do CIVAAs transmissões de cadeiras de rodas e veículos semelhantes, accionados manualmente ou por motor, para portadores de deficiência, aparelhos, máquinas de escrever com caracteres braille, impressoras para caracteres braille e os artefactos que se destinam a ser utilizados por invisuais ou a corrigir a audiçãoM12Isento nos termos da alínea c) do nº1 do artigo 12.º do
-CIVAAs transmissões de cadeiras de rodas e veículos semelhantes, accionados manualmente ou por motor, para portadores de deficiência, aparelhos, máquinas de escrever com caracteres braille, impressoras para caracteres braille e os artefactos que se destinam a ser utilizados por invisuais ou a corrigir a
-audiçãoM13Isento nos termos da alínea d) do nº1 do artigo 12.º do
-CIVAA transmissão de livros, incluindo em formato digitalM14Isento nos termos da alínea e) do nº1 do artigo 12.º do
-CIVAA locação de bens imóveis destinados a fins habitacionais, designadamente prédios urbanos, fracções autónomas destes ou terrenos para construção, com excepção das prestações de serviços de alojamento efectuadas no âmbito da actividade hoteleira ou de outras com funções análogasM15Isento nos termos da alínea f) do nº1 do artigo 12.º do
-CIVAAs operações sujeitas ao imposto de SISA, ainda que dele isentasM16Isento nos termos da alínea g) do nº1 do artigo 12.º do
-CIVAA exploração e a prática de jogos de fortuna ou azar e de diversão social, bem como as respectivas comissões e todas as operações relacionadas, quando as mesmas estejam sujeitas a Imposto Especial sobre o Jogos, nos termos da legislação aplicávelM17Isento nos termos da alínea h) do nº1 do artigo 12.º do
-CIVAO transporte colectivo de passageirosM18Isento nos termos da alínea i) do nº1
-artigo 12.º do CIVAAs operações de intermediação financeira, incluindo a locação financeira, exceptuando-se aquelas em que uma taxa, ou contraprestação, especifica e predeterminada é cobrada pelo serviço.M19Isento nos termos da alínea j) do nº1 do artigo 12.º do
-CIVAO seguro de saúde, bem como a prestação de seguros e resseguros do ramo vida;M20Isento nos termos da alínea k) do nº1 do artigo 12.º do
-CIVAAs transmissões de produtos petrolíferos conforme anexo II do presente código.M21Isento nos termos da alínea l) do nº1As prestações de serviço que tenham por objecto o ensino, efectuadas por estabelecimentos integrados conforme definidos na Lei de Bases do Sistema de Educação e Ensino, bem como por estabelecimentos
-de Ensino Superior devidamente reconhecidos pelo Ministério de Tutela.
-do artigo 12.º do
-CIVAM22Isento nos termos da alínea m) do
-artigo 12.º do CIVAAs prestações de serviço médico sanitário, efectuadas por estabelecimentos hospitalares, clínicas, dispensários e similaresM23Isento nos termos da alínea n) do
-artigo 12.º do CIVAO transporte de doentes ou feridos em ambulâncias ou outros veículos apropriados efectuados por organismos devidamente autorizadosM24Isento nos termos da alínea o) do
-artigo 12.º do CIVAOs equipamentos médicos para o exercício da actividade dos estabelecimentos de saúde.M80Isento nos termos da alinea a) do nº1
-do artigo 14.ºAs importações definitivas de bens cuja transmissão no território nacional seja isenta de imposto;M81Isento nos termos da alinea b) do nº1
-do artigo 14.ºAs importações de ouro, moedas ou notas de banco, efectuadas pelo Banco Nacional de AngolaM82Isento nos termos da alinea c) do nº1
-do artigo 14.ºA importação de bens destinados a ofertas para atenuar os efeitos das calamidades naturais, tais como cheias, tempestades, secas, ciclones, sismos, terramotos e outros de idêntica natureza, desde que
-devidamente autorizado pelo Titular do Poder ExecutivoM83Isento nos termos da alinea d) do nº1
-do artigo 14.ºA importação de mercadorias ou equipamentos destinados exclusivos e directamente à execução das operações petrolíferas e mineiras nos termos da Lei que estabelece o Regime Aduaneiro do Sector
-Petrolífero e do Código Mineiro, respectivamente.M84Isento nos termos da alínea e) do nº1
-do artigo 14.ºImportação de moeda estrangeira efectuada pelas instituições financeiras bancárias, nos termos definidos pelo Banco Nacional de Angola.M85Isento nos termos da alinea a) do nº2
-do artigo 14.ºNo âmbito de tratados e acordos internacionais de que a República de Angola seja parte, nos termos previstos nesses tratados e acordos;M86Isento nos termos da alinea b) do nº2
-do artigo 14.ºNo âmbito de relações diplomáticas e consulares, quando a isenção resulte de tratados e acordos internacionais celebrados pela República de AngolaM30Isento nos termos da alínea a) do
-artigo 15.º do CIVAAs transmissões de bens expedidos ou transportados com destino ao estrangeiro pelo vendedor ou por um terceiro por conta desteM31Isento nos termos da alínea b) do
-artigo 15.º do CIVAAs transmissões de bens de abastecimento postos a bordo das embarcações que efectuem navegação marítima em alto mar e que assegurem o transporte remunerado de passageiros ou o exercício de uma
-actividade comercial, industrial ou de pesca;M32Isento nos termos da alínea c) do
-artigo 15.º do CIVAAs transmissões de bens de abastecimento postos a bordo das aeronaves utilizadas por companhias de navegação aérea que se dediquem principalmente ao tráfego internacional e que assegurem o
-transporte remunerado de passageiros, ou o exercício de uma actividade comercial ou industrialM33Isento nos termos da alínea d) do
-artigo 15.º do CIVAAs transmissões de bens de abastecimento postos a bordo das embarcações de salvamento, assistência marítima, pesca costeira e embarcações de guerra, quando deixem o país com destino a um porto ou
-ancoradouro situado no estrangeiroM34Isento nos termos da alínea e) do artigo 15.º do CIVAAs transmissões, transformações, reparações, manutenção, frete e aluguer, incluindo a locação financeira, de embarcações e aeronaves afectas às companhias de navegação aérea e marítima que se dediquem principalmente ao tráfego internacional, assim como as transmissões de bens de abastecimento postos a bordo das mesmas e as prestações de serviços efectuadas com vista à
-satisfação das suas necessidades directas e da respectiva carga;M35Isento nos termos da alínea f) do
-artigo 15.º do CIVAAs transmissões de bens efectuadas no âmbito de relações diplomáticas e consulares cuja isenção resulte de acordos e convénios internacionais celebrados por Angola;M36Isento nos termos da alínea g) do
-artigo 15.º do CIVAAs transmissões de bens destinados a organismos internacionais reconhecidos por Angola ou a membros dos mesmos organismos, nos limites e com as condições fixadas em acordos e convénios
-internacionais celebrados por AngolaM37Isento nos termos da alínea h) do
-artigo 15.º do CIVAAs transmissões de bens efectuadas no âmbito de tratados e acordos internacionais de que a República de Angola seja parte, quando a isenção resulte desses mesmos tratados e acordos
-
-M38Isento nos termos da alínea i) do
-artigo 15.º do CIVAO transporte de pessoas provenientes ou com destino ao estrangeiro.M90Isento nos termos da alínea a) do nº1
-do artigo 16.ºAs importações de bens que, sob controlo aduaneiro e de acordo com as disposições aduaneiras especificamente aplicáveis, sejam postas nos regimes de zona franca, que sejam introduzidos em
-armazéns de regimes aduaneiros ou lojas francas, enquanto permanecerem sob tais regimes;M91Isento nos termos da alínea b) do nº1
-do artigo 16.ºAs transmissões de bens que sejam expedidos ou transportados para as zonas ou depósitos mencionados na alínea anterior, bem como as prestações de serviços directamente conexas com tais
-transmissões;M92Isento nos termos da alínea c) do nº1
-do artigo 16.ºAs transmissões de bens que se efectuem nos regimes a que se refere a alínea a), assim como as prestações de serviços directamente conexas com tais transmissões, enquanto os bens permanecerem
-naquelas situaçõesM93Isento nos termos da alínea d) do nº1
-do artigo 16.ºAs transmissões de bens que se encontrem nos regimes de trânsito, draubaque ou importação temporária e as prestações de serviços directamente conexas com tais operações, enquanto os mesmos
-forem considerados abrangidos por aqueles regimesM00IVA- Regime
-SimplificadoM02Transmissão de bens e serviço não
-sujeitaM04IVA - Regime de Exclusão
-
-
-
-
-9.2 Tabela de Isenções de IS
-
-CódigoMenção a constar no documentoDescriçãoS01Isento nos termos do CISIsenção no âmbito do Código de Imposto do Selo.S02Isento nos termos do Artº 28º do CBFIsenção de Imposto de Selo nos aumentos de capital constante no Código dos
-Benefícios Fiscais.S03Isento nos termos do Artº 40º do CBFIsenção do pagamento do imposto de selo sobre o recibo de quitação para Micro Empresas (pagamentos recebidos de vendas) constante no Código dos Benefícios
-Fiscais.
-
-
-9.3 Tabela de Isenções de IEC
-
-CódigoMenção a constar no documentoDescriçãoI01Isento nos termos da alínea h) e i) do nº 1 do Artº 6º da LIECIsenção de imposto especial ao consumo na importação e exportação de produtos que beneficiem de um regime suspensivo de direitos aduaneiros
-(taxa fixa de UCF 240).I02Isenção nos termos da alínea a) do nº 1 do
-Artº 6º do LIECIsenção do pagamento do IEC quando a exportação seja feita pelo próprio
-produtor ou entidade vocacionada para o efeito, reconhecida por lei.I03Isenção nos termos da alínea b) do nº 1 do Artº 6º da LIECIsenção do pagamento do IEC nos bens importados por representações diplomáticas ou consulares quando existe reciprocidade de tratamento, bem
-como Organizações Internacionais.I04Isenção nos termos da alínea c) do nº 1 do Artº 6º da LIECIsenção do pagamento do IEC para as matérias-primas para a indústria nacional e os bens destinados para fins medicinais ou de ensino, desde que devidamente certificados, por meio da declaração de exclusividade emitida
-pelo Departamento.I05Isenção nos termos da alínea d) do nº 1 do Artº 6º da LIECIsenção do pagamento do IEC para os bens destinados a fins laboratoriais e de investigação científica.
-
-I06Isenção nos termos da alínea e) do nº 1 do
-Artº 6º da LIECIsenção do pagamento do IEC para os bens de uso pessoal, tal como definido
-na legislação aduaneiraI07Isenção nos termos da alínea f) do nº 1 do Artº 6º da LIECIsenção do pagamento do IEC para os bens destinados ao consumo como provisões de bordo de qualquer meio de transporte colectivo de passageiros
-de tráfego internacional.I08Isenção nos termos da alínea g) do nº 1 do Artº 6º da LIECIsenção do pagamento do IEC para os produtos vendidos a bordo de qualquer meio de transporte colectivo de passageiros de tráfego
-internacionais.I09Isenção nos termos da alínea h) do nº 1 do Artº 6º da LIECIsenção do pagamento do IEC para os produtos que beneficiem da aplicação de um regime suspensivo de direitos aduaneiros.I10Isenção nos termos da alínea i) do nº 1 do Artº
-6º da LIECIsenção do pagamento do IEC para os produtos vendidos em lojas francas.I11Isenção nos termos da alínea b) do Artº 98º do IPP e Artº 15º do CIVAIsenção de impostos aduaneiros, isenção de imposto especial ao consumo e taxas alfandegárias reduzidas na importação e exportação relativas a abastecimento de provisões de bordo relativas ao funcionamento e manutenção do meio de transporte (combustível, carburantes e lubrificantes
-excluindo as partes e acessórios).I12Isenção nos termos da alínea c) do Artº 98º do IPP e Artº 15º do CIVAIsenção de impostos aduaneiros, isenção de imposto especial ao consumo e taxas alfandegárias reduzidas na importação e exportação relativas a abastecimento de provisões de bordo relativas ao funcionamento e manutenção do meio de transporte (combustível, carburantes e lubrificantes
-excluindo as partes e acessórios) (taxa fixa de UCF 240)I13Isenção nos termos das alíneas h) e i) do Artº 98º do IPP e Artº 15º do CIVAIsenção de impostos aduaneiros, isenção de imposto especial ao consumo e taxas alfandegárias reduzidas na importação e exportação de produtos que
-beneficiem de um regime suspensivo de direitos aduaneiros.I14Isenção nos termos do anexo I da LIECIsenção de imposto especial ao consumo na importação de produtos com código pautal 3926.90.90, excepto as palhinhas de plástico.I15Isenção nos termos do Artº 70º do IPP e Artº
-11 da Lei 18/19Isenção de impostos aduaneiros e de imposto especial ao consumo na
-importação de mercadorias para serem utilizadas em eventosI16Isenção nos termos da Resolução nº 6/91 e alíneas a) e b) do nº2 do Artº 14º do CIVAIsenção de impostos aduaneiros, imposto especial ao consumo e IVA na importação e exportação de mercadorias efectuadas por agências
-especializadas das nações unidas.
-
-9.4 Códigos e mensagens de erro no retorno do Serviço
-
-Código de
-erroDescrição de erroE01Falta de parâmetro <parâmetro>E02Formato inválido do parâmetro <parâmetro> (<valor do parâmetro>).E03Valor não esperado do parâmetro <parâmetro> (<valor do parâmetro>).E04Número de facturas especificado no parâmetro "numberOfEntries" (<valor de numberOfEntries>) não coincide com o número de ocorrências do array "documents" (<nº de ocorrências de documents>).E05Número fiscal do emissor especificado no parâmetro <parâmetro> (<valor do parâmetro>) não possui actividade
-registada no sistema da AGT.E06A data de criação do pedido especificado no parâmetro "creationDate" (<valor do parâmetro>) não está dentro do
-período permitido.E07Software de facturação especificado no parâmetro "softwareValidationNo" (<valor do parâmetro>) não está certificadoE08A assinatura do Produtor de Software "jwsSoftwareSignature" não está de acordo com a informação transmitida.E39Os dados constantes na assinatura do Produtor de Software "jwsSoftwareSignature" não estão de acordo com a
-informação
-constante no processo de Certificação do Software.E09Factura especificada no parâmetro <parâmetro> (<valor do parâmetro>) já consta no repositório do sistema
-E10Incorrecta especificação do contribuinte no preenchimento dos parâmetros "customerTaxID" (<valor do parâmetro>), "taxIDNumber" (<valor do parâmetro>) e "taxIDCountry" (<valor do parâmetro>)E11Número fiscal Angolano especificado no parâmetro <parâmetro> (<valor do parâmetro>) é desconhecido no sistema da AGT.E12Incorrecto número de linha de artigo na factura preenchido no parâmetro "lineNo" (<valor do parâmetro>) originando
-repetição ou quebra de sequênciaE13É esperado documento de facturação de referência para a factura transmitida que não foi especificado no parâmetro
-"referenceInfo"E14Documento de referência preenchido no parâmetro "reference" (<valor do parâmetro>) é desconhecido do sistema.E15Não podem ser especificados em simultâneo os parâmetros <parâmetro1> (<valor do parâmetro1>) e <parâmetro2> (<valor do parâmetro2>).E16A soma dos valores a crédito para as diferentes linhas de um documento de facturação deve ser obrigatoriamente inferior à soma dos valores a débito quando se trata de uma nota de crédito.E17A soma dos valores a crédito para as diferentes linhas de um documento de facturação deve ser obrigatoriamente superior
-à soma dos valores a débito quando se trata de um documento diferente de nota de crédito.E18Combinação não permitida dos campos <parâmetro1> (<valor do parâmetro1>), <parâmetro2> (<valor do parâmetro2>),
-<parâmetro3> (<valor do parâmetro3>), <parâmetro4> (<valor do parâmetro4>).E19O campo "taxBase" (<valor do parâmetro>) não pode estar especificado simultaneamente com um dos campos "debitAmount" (<valor do parâmetro>) ou "creditAmount" (<valor do parâmetro>).E20Combinação não permitida dos campos <parâmetro1> (<valor do parâmetro1>), <parâmetro2> (<valor do parâmetro2>)E21Valor do campo <parâmetro1> (<valor do parâmetro1>) não coincide com a aplicação da fórmula: quantity *
-unitPriceBaseE22Valor total de impostos da factura "taxPayable" (<valor do parâmetro>), não corresponde à soma dos impostos de
-todas as
-linhas (<total calculado>)E23Valor total do documento sem impostos "netPayable" (<valor do parâmetro>), não corresponde à soma dos valores
-sem
-impostos de todas as linhas (<total calculado>)E24Valor total do documento com impostos "grossPayable" (<valor do parâmetro>), não corresponde à soma dos valores
-com
-impostos de todas as linhas (<total calculado>)E25Valor registado na factura no campo "grossTotal" não corresponde ao valor na divisa utilizada no pagamento
-(<valor do parâmetro>) ao câmbio da divisa (<valor do parâmetro>)E26Utilização incorrecta do campo "lines" para o tipo de factura (<valor do parâmetro>)E27Utilização incorrecta do campo "paymentReceipt" para o tipo de factura (<valor do parâmetro>)E28Número fiscal do emissor especificado no parâmetro <parâmetro> (<valor do parâmetro>) não aderiu à facturação electrónica no sistema da AGT.E29A data de emissão do documento de facturação "documentDate" (<valor do parâmetro>) é anterior à data de adesão
-do contribuinte à facturação electrónica (<data de adesão>).E40Os dados constantes na assinatura da chamada do serviço "jwsSignature" não estão de acordo com a informação
-constante
-na chamada do serviço.E41A soma dos valores a regularizar assinalados nos campos "debitAmount"/"creditAmount" (<valor do parâmetro>) para o documento dado em "OriginatingON"(<valor do parâmetro>) excede o montante remanescente do referido
-documento.E08A assinatura do Produtor de Software "jwsSoftwareSignature" não está de acordo com a informação transmitida.E39Os dados constantes na assinatura do Produtor de Software "jwsSoftwareSignature" não estão de acordo com a
-informação
-constante no processo de Certificação do Software.E40Os dados constantes na assinatura da chamada do serviço "jwsSignature" não estão de acordo com a informação
-constante
-na chamada do serviço.E08A assinatura do produtor de software "jwsSoftwareSignature" não está de acordo com a informação transmitida.E40Os dados constantes na assinatura da chamada do serviço "jwsSignature" não estão de acordo com a informação
-constante
-na chamada do serviço.E30Contribuinte especificado no parâmetro <parâmetro> (<valor do parâmetro>) não possui actividade registada no sistema da
-AGT.E06Contribuinte especificado no parâmetro <parâmetro> (<valor do parâmetro>) não aderiu à facturação electrónica no sistema
-da AGT.E31Código de série de numeração (<valor do parâmetro1>) já se encontra em utilização para o contribuinte (<valor do parâmetro2>).E32Código de série mal construído (<valor do parâmetro>), deverá conter o ano de emissão com 2 ou 4 dígitos.E33Ano de emissão da série (<valor do parâmetro 1>) deve coincidir com o ano da data de sistema (<valor do parâmetro 2>
-(solicitações anteriores a 15 de Dezembro).E34Série da factura (<valor do parâmetro 1>) é inexistente para o contribuinte (<valor do parâmetro 2>).E35A factura que se pretende criar (<valor do parâmetro 1>) refere-se a uma série de numeração de documentos de facturação
-não electrónicos.E36O Software de Facturação que está a gerar a factura (<valor do parâmetro 1>) não coincide com o Software de Facturação
-que gerou a série (<valor do parâmetro 2>).E37O tipo de factura a emitir (<valor do parâmetro 1>) não coincide com o tipo de factura que foi destinada a série de facturação (<valor do parâmetro 2>).E38O ano de emissão da factura (<valor do parâmetro 1>) não coincide com o ano de emissão a que se refere a série de facturas (<valor do parâmetro 2>).
-
-9.5 Códigos de Actividade Econónica - CAE
-
-
-A lista de códigos definidos para os CAE, é baseada na lista publicada pelo INE, nomeadamente:
-CódigoDescrição01111Cerealicultura (excepto arroz)01112Leguminosas secas e sementes oleaginosas01120Cultura de arroz01131Cultura de mandioca01132Cultura de produtos hortícolas e de outras raízes e tubérculos01140Cultura de cana-de-açúcar
-01150Cultura de tabaco01161Cultura de algodão01162Cultura de sisal01163Outras culturas de plantas têxteis01191Cultura de flores e de plantas ornamentais01192Outras culturas temporárias, n. e.01210Viticultura01220Culturas de frutos tropicais e subtropicais01230Cultura de citrinos01240Cultura de pomóideas e prunóideas01250Cultura de outros frutos (inclui casca rija) em árvores e arbustos01260Cultura de frutos oleaginosos01271Cafeicultura01272Outras culturas de plantas destinadas à preparação de bebidas01280Cultura de especiarias, plantas aromáticas, medicinais e farmacêuticas01290Outras culturas permanentes01300Cultura de materiais de propagação vegetativa01410Bovinicultura01420Criação de gado cavalar, asinino e muar01430Criação de gado ovino e caprino01440Suinicultura01450Avicultura01491Apicultura01492Criação de animais de companhia01493Outra produção animal, n.e01500Agricultura e produção animal combinadas01610Actividades dos serviços relacionados com a agricultura01620Actividades dos serviços relacionados com a produção animal, excepto serviços veterinários01630Preparação de produtos agrícolas para a venda01640Preparação e tratamento de sementes para propagação
-01700Caça, repovoamento cinegético e actividades dos serviços relacionados02100Silvicultura e outras actividades florestais02200Exploração florestal02300Extracção de cortiça, resina e apanha de outros produtos florestais, excepto madeira02400Actividades dos serviços relacionados com a silvicultura e exploração florestal03111Pesca marítima03112Apanha de algas e de outros produtos do mar03120Pesca e apanha de produtos em águas interiores03210Aquacultura em águas salgadas e salobras03220Aquacultura em águas doces05100Extracção de hulha05200Extracção de lenhite06100Extracção de petróleo bruto06200Extracção de gás natural07100Extracção e preparação de minérios de ferro07210Extracção e preparação de minérios de urânio e de tório07291Extracção e preparação de minérios de cobre07292Extracção e preparação de minérios de metais preciosos07293Extracção e preparação de outros minérios metálicos não ferrosos (excepto minérios de urânio e de tório), n.e.08101Extracção de mármore e rochas similares08102Extracção de calcário, gesso e cré08103Extracção de saibro, areia e pedra britada08104Extracção de argila e caulino08910Extracção de minerais para a indústria química e para a fabricação de adubos08920Extracção de sal08991Extracção de diamantes08992Extracção de outros minerais não metálicos, n.e09100Actividades dos serviços relacionados com a extracção de petróleo e gás, excepto a prospecção09900Outras actividades dos serviços relacionados com as indústrias extractivas10101Abate de gado (produção de carne)
-10102Abate de aves (produção de carne)10103Fabricação de produtos à base de carne10201Preparação de produtos da pesca e da aquacultura10202Congelação de produtos da pesca e da aquacultura10203Conservação de produtos da pesca e da aquacultura em azeite e outros óleos vegetais e outros molhos10204Secagem, salgas e outras actividades de transformação de produtos da pesca e da aquacultura10301Fabricação de sumos de frutos e de produtos hortícolas10302Congelação de frutos e de produtos hortícolas10303Fabricação de doces, compotas, geleias e marmelada10304Secagem e desidratação de frutos e produtos hortícolas10305Preparação e conservação de batatas10306Preparação e conservação de frutos e de produtos hortícolas, por outros processos10401Produção e refinação de óleos gorduras vegetais10402Produção e refinação de óleos e gorduras animais10403Fabricação de margarinas e de gorduras alimentares similares10501Indústrias do leite e derivados10502Fabricação de gelados e sorvetes10611Moagem de cereais10612Descasque, branqueamento e glaciagem do arroz10613Transformação de cereais e leguminosas, n.e10620Fabricação de amidos, féculas e produtos afins10711Panificação10712Pastelaria10713Fabricação de bolachas, biscoitos, tostas e pastelaria de conservação10720Indústria do açúcar10730Indústria do cacau, do chocolate e dos produtos de confeitaria10740Fabricação de massas alimentícias, cuscuz e similares10750Fabricação de refeições e pratos pré-cozinhados10791Refinação do sal10792Indústria do café e do chá
-10793Fabricação de outros produtos alimentares diversos, n.e.10800Fabricação de alimentos para animais11010Fabricação de bebidas alcoólicas destiladas11020Produção de vinho e de bebidas fermentadas de frutos11030Fabricação de cerveja e malte11041Engarrafamento de águas minerais naturais e de nascente11042Fabricação de refrigerantes e de outras bebidas não alcoólicas, n.e.12000Indústria do Tabaco13111Preparação, fiação e tecelagem de algodão, de fibras artificiais, sintéticas e mistas13112Fabricação de linhas de costura13113Preparação, fiação e tecelagem de outras fibras têxteis13120Acabamento de têxteis13910Fabricação de artigos têxteis confeccionados, excepto vestuário13920Fabricação de tapetes e carpetes13930Fabricação de cordoaria e redes13991Fabricação de bordados e rendas13992Fabricação de outros artigos têxteis diversos, n.e.14101Confecção de vestuário de trabalho e de uniformes14102Confecção de outro vestuário exterior em série14103Confecção de outro vestuário exterior por medida14104Confecção de outros artigos e acessórios de vestuário14200Fabricação de artigos de peles com pêlo14300Fabricação de artigos de malha15110Curtimenta e acabamento de peles, sem pêlo e com pêlo15120Fabricação de artigos de viagem e de uso pessoal, de marroquinaria, de correeiro e de seleiro15200Indústria do calçado e seus componentes16100Serração, aplainamento e impregnação da madeira16210Fabricação de folheados, contraplacados, painéis lamelados, de partículas, de fibras e de outros painéis16220Fabricação de obras de carpintaria para a construção16230Fabricação de embalagens de madeira
-16291Fabricação de obras de cestaria, de espartaria e similares16292Indústria da cortiça e de outras obras de madeira, n.e.17010Fabricação de pasta, de papel e cartão (excepto canelado)17020Fabricação de papel e de cartão canelados e de embalagens de papel e cartão17030Fabricação de artigos de papel para uso doméstico e sanitário17090Fabricação de artigos de pasta de papel, de papel e de cartão, n.e18110Impressão18120Actividades relacionadas com a impressão18200Reprodução de suportes gravados19100Fabricação de produtos de coqueria19200Fabricação de produtos petrolíferos refinados e de aglomerados de combustíveis20111Fabricação de gases industriais20112Fabricação de álcool etílico de fermentação20113Fabricação de outros produtos químicos de base20120Fabricação de adubos e de compostos azotados20130Fabricação de matérias plásticas e de borracha sintética sob formas primárias20210Fabricação de pesticidas e de outros produtos agroquímicos20220Fabricação de tintas, vernizes e produtos similares; mastiques; tintas de impressão20231Fabricação de sabões e detergentes, produtos de limpeza e de polimento20232Fabricação de perfumes, cosméticos e de produtos de higiene20291Fabricação de explosivos e artigos de pirotecnia20292Fabricação de outros produtos químicos, diversos, n.e.20300Fabricação de fibras sintéticas ou artificiais21000Fabricação de produtos farmacêuticos de base e de preparações farmacêuticas22111Fabricação de pneus e câmaras-de-ar22112Reconstrução de pneus22190Fabricação de produtos de borracha, n.e.22201Fabricação de chapas, folhas, tubos e perfis de plástico22202Fabricação de embalagens de plástico22203Fabricação de artigos de plástico, n.e.
-23100Fabricação de vidro e artigos de vidro23910Fabricação de produtos cerâmicos refractários23921Fabricação de azulejos, ladrilhos, mosaicos e placas de cerâmica23922Fabricação de tijolos, telhas e de outros produtos de barro para a construção23930Fabricação de outros produtos de porcelana e cerâmicos não refractários23941Fabricação de cimento23942Fabricação de cal e gesso23951Fabricação de betão pronto e produtos de betão para a construção (excepto blocos)23952Fabricação de produtos de fibrocimento23953Fabricação de blocos de cimento para construção23954Fabricação de outros produtos de betão, gesso e cimento23960Serragem, corte e acabamento de rochas ornamentais e de outras pedras de construção23990Fabricação de outros produtos minerais não metálicos, n.e.24100Indústrias metalúrgicas de base do ferro e do aço24201Obtenção e primeira transformação de metais preciosos24202Obtenção e primeira transformação do zinco24203Obtenção e primeira transformação de outros metais não ferrosos24310Fundição de ferro fundido e de aço24320Fundição de metais não ferrosos25111Fabricação de estruturas de construções metálicas25112Fabricação de portas, janelas e elementos similares em metal25120Fabricação de reservatórios, recipientes, caldeiras e radiadores metálicos para aquecimento central25130Fabricação de geradores de vapor (excepto caldeiras para aquecimento central)25200Fabricação de armas e munições25910Fabricação de produtos forjados, estampados e laminados; metalurgia dos pós25920Tratamento e revestimento de metais; actividades de mecânica geral25931Fabricação de cutelaria25932Fabricação de fechaduras, dobradiças e de outras ferragens25933Fabricação de ferramentas e de moldes metálicos25991Fabricação de embalagens metálicas
-25992Fabricação de produtos de arame, rebites, parafusos, molas e correntes metálicas25993Fabricação de outros produtos metálicos, n.e.26100Fabricação de componentes e de placas, electrónicos26200Fabricação de computadores e equipamento periférico26300Fabricação de equipamentos de comunicação26400Fabricação de receptores de rádio e de televisão e bens de consumo similares26510Fabricação de instrumentos e aparelhos de medida, verificação, controlo, navegação e outros fins26520Fabricação de relógios e material de relojoaria26600Fabricação de equipamentos de radiação, electromedicina e electroterapêutico26700Fabricação de material e equipamento óptico26800Fabricação de suportes de informação magnéticos e ópticos27101Fabricação de motores, geradores e transformadores eléctricos27102fabricação de material de distribuição e de controlo para instalações eléctricas27200Fabricação de acumuladores e de pilhas eléctricas27300Fabricação de fios e cabos isolados e seus acessórios27400Fabricação de lâmpadas eléctricas e de outro material de iluminação27501Fabricação de electrodomésticos27502Fabricação de aparelhos não eléctricos para o uso doméstico27900Fabricação de outro equipamento eléctrico28110Fabricação de motores e turbinas, excepto motores para aeronaves, automóveis e motociclos28120Fabricação de equipamento hidráulico e pneumatico, bombas, compressores, torneiras, e válvulas28130Fabricação de rolamentos, de engrenagens e de outros órgãos de transmissão28140Fabricação de fornos e queimadores28150Fabricação de equipamento de elevação e de movimentação28160Fabricação de máquinas e equipamento de escritório, excepto computadores e equipamento periférico28170Fabricação de máquinas-ferramentas portáteis com motor28190Fabricação de outras máquinas de uso geral28210Fabricação de máquinas e de tractores para a agricultura, pecuária e silvicultura28220Fabricação de outras máquinas-ferramentas para metais, excepto portáteis28230Fabricação de máquinas para a metalurgia
-28250Fabricação de máquinas para as indústrias alimentares, das bebidas e do tabaco28260Fabricação de máquinas para as indústrias têxtil, do vestuário e do couro28290Fabricação de outras máquinas e equipamentos para uso específico, n.e.29100Fabricação de veículos automóveis29200Fabricação de carroçarias, reboques e semi-reboques29300Fabricação de componentes e acessórios para veículos automóveis e seus motores30110Construção de embarcações, excepto de recreio e desporto30120Construção de embarcações de recreio e desporto30200Fabricação de material circulante para caminhos-de-ferro30300Fabricação de aeronaves, de veículos espaciais e equipamento relacionado30400Fabricação de veículos militares de combate30910Fabricação de motociclos30920Fabricação de bicicletas e veículos para deficientes físicos30990Fabricação de outro equipamento de transporte, n.e.31001Fabricação de mobiliário de madeira31002Fabricação de mobiliário metálico31003Fabricação de colchões31004Fabricação de mobiliário n.e.32110Fabricação de joalharia, ourivesaria e artigos similares; cunhagem de moedas32120Fabricação de bijutarias32200Fabricação de instrumentos musicais32300Fabricação de artigos de desporto32400Fabricação de jogos e de brinquedos32500Fabricação de instrumentos e material médico-cirúrgico32901Fabricação de vassouras, escovas e pincéis32902Fabricação de canetas, lápis e similares32903Fabricação de caixões mortuários em madeira32904Outras indústrias transformadoras, n.e.33110Reparação e manutenção de produtos metálicos, excepto reparação de máquinas e equipamentos33120Reparação e manutenção de máquinas e equipamentos
-33130Reparação e manutenção de equipamento electrónico e óptico33140Reparação e manutenção de equipamento eléctrico33150Reparação e manutenção de equipamento de transporte, excepto veículos automóveis33190Reparação e manutenção de outro equipamento33200Instalação de máquinas e equipamentos industriais35101Produção de electricidade35102Transporte de electricidade35103Distribuição e comércio de electricidade35200Produção de gás; distribuição de combustíveis gasosos por condutas35301Produção e distribuição de vapor, água quente e fria e ar frio por conduta35302Produção de gelo36000Captação, tratamento e distribuição de água37000Recolha, Drenagem e Tratamento de Águas Residuais38110Recolha de resíduos não perigosos38120Recolha de resíduos perigosos38210Tratamento e eliminação de resíduos não perigosos38220Tratamento e eliminação de resíduos perigosos38301Valorização de sucatas e de resíduos metálicos38302Valorização de resíduos não metálicos39000Descontaminação e Actividades Similares41001Promoção imobiliária41002Construção de edifícios ( residenciais e não residenciais)42100Construção de auto-estradas, estradas, pontes, túneis, aeroportos e vias-férreas42200Construção de redes de transporte de água, de esgotos e de outros fluidos, de distribuição de energia, de telecomunicação e de outras redes42900Construção de outras obras de engenharia civil43100Demolição e preparação dos locais de construção43210Instalação eléctrica43220Instalação de canalizações e de climatização43290Outras instalações em construções
-43301Montagem de trabalhos de carpintaria e de caixilharia43302Estucagem, revestimento de pavimentos e de paredes43303Outras actividades de acabamento43901Aluguer de equipamento de construção e de demolição, com operador43902Outras obras especializadas de construção, n.e.45100Comércio de veículos automóveis45200Manutenção e reparação de veículos automóveis45300Comércio de peças e acessórios para veículos automóveis45401Comércio por grosso e a retalho de motociclos, de suas peças e acessórios45402Manutenção e reparação de motociclos, de suas peças e acessórios46101Agentes do comércio por grosso de matérias-primas agrícolas e têxteis, animais vivos e produtos semi-acabados46102Agentes do comércio por grosso de combustíveis, minérios, metais, produtos químicos para a indústria, máquinas, equipamentos industriais, embarcações e aeronaves46103Agentes do comércio por grosso de madeira, materiais de construção, mobiliário, artigos para uso doméstico e ferragens46104Agentes do comércio por grosso de produtos alimentares, bebidas e tabaco46105Agentes do comércio por grosso misto sem predominância46106Agentes especializados do comércio por grosso de produtos, n.e.46201Comércio por grosso de cereais, sementes, leguminosas, oleaginosas e alimentos para animais46202Comércio por grosso de flores e plantas46203Comércio por grosso de animais vivos, de peles e couro46204Comércio por grosso de tabaco em bruto46301Comércio por grosso de frutas e de produtos hortícolas46302Comércio por grosso de carne e de produtos à base de carne46303Comércio por grosso de leite e derivados, ovos, azeite, óleo e gorduras alimentares46304Comércio por grosso de bebidas46305Comércio por grosso de tabaco46306Comércio por grosso de café, açúcar, chá, cacau, produtos de confeitaria e de especiarias46307Comércio por grosso de peixe, crustáceos e moluscos46308Comércio por grosso de outros produtos alimentares46411Comércio por grosso de têxteis, vestuário e acessórios
-46412Comércio por grosso de calçado46491Comércio por grosso de electrodomésticos, aparelhos de rádio e de televisão46492Comércio por grosso de louças em cerâmica e em vidro, de papel de parede e de produtos de limpeza46493Comércio por grosso de perfumes, de produtos de higiene e de produtos farmacêuticos46494Comércio por grosso de artigos de papelaria, livros, revistas e jornais46495Comércio por grosso de outros bens de consumo, excepto alimentares, bebidas e tabaco46510Comércio por grosso de computadores, equipamentos periféricos e programas informáticos, excepto outras máquinas e equipamento de escritório46520Comércio por grosso de outros componentes e equipamentos electrónicos e de telecomunicações46530Comércio por grosso de máquinas e equipamentos agrícolas46591Comércio por grosso de máquinas-ferramentas, de máquinas para construção e de engenharia civil46592Comércio por grosso de mobiliário de escritório, de máquinas e equipamento de escritório, excepto computadores46593Comércio por grosso de máquinas e equipamentos para a indústria, comércio, navegação e para outros fins, n.e.46610Comércio por grosso de combustíveis sólidos, líquidos, gasosos e produtos derivados46620Comércio por grosso de minérios e de metais46631Comércio por grosso de madeira em bruto e de produtos derivados46632Comércio por grosso de materiais de construção (excepto madeira) e equipamento sanitário46633Comércio por grosso de ferragens, ferramentas manuais e artigos para canalização e aquecimento46691Comércio por grosso de produtos químicos46692Comércio por grosso de bens intermédios não agrícolas, n.e., de desperdícios e de sucatas46900Comércio por grosso, n.e.47111Comércio a retalho em supermercados e hipermercados47112Comércio a retalho em outros estabelecimentos não especializados, com predominância de produtos alimentares, bebidas ou tabaco47190Comércio a retalho em estabelecimentos não especializados, sem predominância de produtos alimentares, bebidas ou tabaco47211Comércio a retalho de frutas e de produtos hortícolas, em estabelecimentos especializados47212Comércio a retalho de carne e de produtos à base de carne, em estabelecimentos especializados47213Comércio a retalho de peixe, crustaceos e moluscos, em estabelecimentos especializados47214Comércio a retalho de pão, de produtos de pastelaria e de confeitaria, em estabelecimentos especializados47215Comércio a retalho de outros produtos alimentares, em estabelecimentos especializados
-47220Comércio a retalho de bebidas, em estabelecimentos especializados47230Comércio a retalho de tabaco, em estabelecimentos especializados47300Comércio a retalho de combustível para veículos a motor, em estabelecimentos especializados47411Comércio a retalho de computadores, equipamentos periféricos e programas informáticos (software), em estabelecimentos especializados47412Comércio a retalho de equipamento de telecomunicações, em estabelecimentos especializados47420Comércio a retalho de equipamento audiovisual, em estabelecimentos especializados47510Comércio a retalho de têxteis, em estabelecimentos especializados47520Comércio a retalho de ferragens, tintas, vidros, equipamento sanitário, ladrilhos e similares, em estabelecimentos especializados47530Comércio a retalho de carpetes, tapetes, cortinados e outros revestimentos para paredes e pavimentos, em estabelecimentos especializados47591Comércio a retalho de electrodomésticos, em estabelecimentos especializados47592Comércio a retalho de mobiliário e artigos de iluminação, em estabelecimentos especializados47593Comércio a retalho de louças, cutelaria e de outros artigos similares para uso doméstico, em estabelecimentos especializados47594Comércio a retalho de outros artigos para o lar, n.e., em estabelecimentos especializados47610Comércio a retalho de livros, jornais e artigos de papelaria, em estabelecimentos especializados47620Comércio a retalho de discos, CD, DVD, cassetes e produtos similares, em estabelecimentos especializados47630Comércio a retalho de artigos de desporto, de campismo e lazer, em estabelecimentos especializados47640Comércio a retalho de brinquedos e jogos, em estabelecimentos especializados47711Comércio a retalho de vestuário, em estabelecimentos especializados47712Comércio a retalho de marroquinaria e artigos de viagem e de calçado, em estabelecimentos especializados47720Comércio a retalho de produtos farmacêuticos, médicos e ortopédicos, cosméticos e de higiene, em estabelecimentos especializados47731Comércio a retalho de relógios e de artigos de ourivesaria e joalharia, em estabelecimentos especializados47732Comércio a retalho de flores, plantas, sementes e fertilizantes, em estabelecimentos especializados47733Comércio a retalho de combustíveis para uso doméstico, em estabelecimentos especializados47734Comércio a retalho de material óptico, fotográfico, cinematográfico e de instrumentos de precisão, em estabelecimentos especializados47735Comércio a retalho de animais de estimação e respectivos alimentos, em estabelecimentos especializados47736Comércio a retalho de máquinas e de outro material de escritório, em estabelecimentos especializados47737Comércio a retalho de outros produtos novos, n.e., em estabelecimentos especializados
-47740Comércio a retalho de artigos em segunda mão, em estabelecimentos especializados47810Comércio a retalho em bancas, feiras e unidades móveis de venda de produtos alimentares, bebidas e tabaco47820Comércio a retalho em bancas, feiras e unidades móveis de venda de têxteis, vestuário, calçado, malas e similares47890Comércio a retalho em bancas, feiras e unidades móveis de venda de outros produtos, n.e.47910Comércio a retalho por correspondência ou via Internet47990Comércio a retalho por outros métodos, não efectuado em estabelecimentos, em bancas, feiras ou unidades móveis49110Transporte interurbano de passageiros por caminho-de-ferro49120Transporte de mercadorias por caminho-de-ferro49210Transportes terrestres, urbanos e suburbanos, regulares de passageiros49220Outros transportes terrestres não regulares de passageiros49230Transportes rodoviários de mercadorias49300Transportes por oleodutos e gasodutos50110Transportes marítimos de passageiros50120Transportes marítimos de mercadorias50210Transportes de passageiros por vias navegáveis interiores50220Transportes de mercadorias por vias navegáveis interiores51100Transportes aéreos de passageiros51200Transportes aéreos de mercadorias52100Armazenagem52210Actividades auxiliares dos transportes terrestres52220Actividades auxiliares dos transportes por água52230Actividades auxiliares dos transportes aéreos52240Manuseamento de carga52290Actividades de agentes transitários, aduaneiros e de outras actividades de apoio ao transporte53100Actividades dos correios nacionais53200Actividades postais independentes dos correios nacionais55111Hotéis com restaurante55112Complexos turísticos com restaurante55113Pensões com restaurante
-55114Estabelecimento hoteleiros com restaurante, n.e.55121Hotéis sem restaurante55122Pensões sem restaurante55123Estabelecimentos hoteleiros sem restaurante, n.e.55200Parques de campismo e de caravanismo55900Outros locais de alojamento56101Restaurantes do tipo tradicional56102Restaurantes com lugares ao balcão (Snack bares)56103Restaurantes sem serviço de mesa56104Restaurantes, n.e.56210Fornecimento de refeições para eventos56220Outras actividades de serviços de refeições56301Cafés e pastelarias56302Cervejarias e bares56303Outros estabelecimentos de bebidas58110Edição de livros58120Edição de listas destinadas a consulta58130Edição de jornais, revistas e de outras publicações periódicas58190Outras actividades de edição58200Edição de programas informáticos59110Produção de filmes, vídeos e de programas de televisão59120Actividades técnicas de pos-produção de filmes, vídeos e programas de televisão59130Distribuição de filmes, vídeos e programas de televisão59140Projecção de filmes e de vídeos59200Actividades de gravação de som e de edição de música60100Actividades de rádio60200Actividades de televisão61100Actividades de telecomunicações por fio61200Actividades de telecomunicações sem fio61300Actividades de telecomunicações por satélite
-61900Outras actividades de telecomunicações62010Actividades de programação informática62021Actividades de consultoria em informática62022Gestão e exploração de equipamento informático62090Outras actividades dos serviços relacionadas com as tecnologias de informação e informática63110Actividades de processamento de dados, domiciliação de informação e actividades relacionadas63120Portais Web63910Actividades de agências de notícias63990Outras actividades dos serviços de informação, n.e.64110Banco Central64191Instituições bancárias64192Outra intermediação monetária, n.e.64200Actividades das sociedades gestoras de participações sociais64300Trusts, fundos e entidades financeiras similares64910Actividade de locação financeira64920Outras actividades de crédito64990Outras actividades de serviços financeiros, n.e. (excepto seguros e fundos de pensões )65110Seguros de vida e outras actividades complementares de segurança social65120Seguros não vida65200Resseguros65300Fundos de pensões66110Administração de mercados financeiros66120Actividades de negociação por conta de terceiros em valores mobiliários e outros instrumentos financeiros66190Outras actividades auxiliares dos serviços financeiros, excepto seguros e fundos de pensões66210Actividades de avaliação do risco e danos66220Actividade de mediadores de seguros66290Outras actividades auxiliares de seguros e de fundos de pensões66300Actividades de gestão de fundos68100Actividades imobiliárias por conta própria68200Actividades imobiliárias por conta de outrem
-69100Actividades jurídicas69200Actividades de contabilidade e auditoria; consultoria fiscal70100Actividades das sedes sociais70200Actividades de consultoria para os negócios e a gestão71101Actividades de arquitectura71102Actividades de engenharia e técnicas afins71200Actividades de ensaios e análises técnicas72100Investigação científica e desenvolvimento das ciências físicas e naturais72200Investigação científica e desenvolvimento das ciências sociais e humanas73100Publicidade73200Estudos de mercado e sondagens de opinião74100Actividades de design74200Actividades fotográficas74900Outras actividades de consultoria, científicas, técnicas e similares, n.e.75000Actividades veterinárias77100Aluguer de veículos automóveis77210Aluguer de bens recreativos e desportivos77220Aluguer de videocassetes e discos77290Aluguer de outros bens de uso pessoal e doméstico77301Aluguer de máquinas e equipamentos agrícolas77302Aluguer de máquinas e equipamentos para construção e engenharia civil77303Aluguer de máquinas e equipamentos de escritório (inclui computadores )77304Aluguer de meios de transporte marítimo e fluvial77305Aluguer de meios de transporte aéreo77306Aluguer de meios de transporte terrestre, excepto veículos automóveis77307Aluguer de outras máquinas e equipamentos, n.e.77400Locação de propriedade intelectual e produtos similares, excepto direitos de autor78100Actividades das empresas de selecção e colocação de pessoal78200Actividades das empresas de trabalho temporário78300Outro fornecimento de recursos humanos
-79110Actividades das agências de viagem79120Actividade dos operadores turísticos79900Outras actividades de reservas80100Actividades de segurança privada80200Actividades relacionadas com sistemas de segurança80300Actividades de investigação81100Actividades combinadas de apoio à gestão de edifícios81210Actividades de limpeza geral em edifícios81290Outras actividades de limpeza em edifícios e em equipamentos industriais81300Actividades de plantação e manutenção de jardins82110Actividades combinadas de serviços administrativos82190Execução de fotocópias, preparação de documentos e outras actividades especializadas de apoio administrativo82200Actividades dos centros de chamadas82300Organização de feiras, congressos e outros eventos similares82910Actividades de cobrança e avaliação de crédito82920Actividades de embalagem82990Outras actividades de serviços de apoio prestados às empresas, n.e.84111Administração central84112Administração regional e local84113Actividades de apoio à administração pública84121Administração pública - actividades de saúde84122Administração pública - actividades de educação84123Administração pública - actividades da cultura, desporto, recreio, ambiente, habitação e de outras actividades sociais, excepto segurança social obrigatória84130Administração pública - actividades económicas84210Relações exteriores84220Actividades de defesa84231Justiça84232Actividades de segurança e ordem pública84233Actividades de protecção civil
-84300Segurança social obrigatória85101Educação pré-escolar85102Ensino primário85211Ensino geral do 1º ciclo85212Formação profissional básica85221Ensino geral do 2º ciclo85222Formação média técnico-profissional85223Formação de professores85300Ensino superior85410Ensino desportivo e recreativo85420Ensino das actividades culturais85491Escolas de condução e pilotagem85492Formação profissional85493Outras actividades educativas, n.e.85500Actividades de serviços de apoio à educação86100Actividades dos estabelecimentos de saúde com internamento86201Actividades de prática médica de clínica geral, em ambulatório86202Actividades de prática médica de clínica especializada, em ambulatório86203Actividades de medicina dentária e odontologia86901Laboratórios de análises clínicas86902Actividades de enfermagem86903Outras actividades de saúde humana, n.e.87100Actividades de enfermagem com alojamento87200Actividades dos estabelecimentos para pessoas com doenças do foro mental e toxicodependência, com alojamento87301Actividades de acção social para pessoas idosas, com alojamento87302Acção social para pessoas com deficiência, com alojamento87901Actividades de acção social para crianças e jovens, com alojamento87902Outras actividades de acção social, com alojamento, n.e.88101Actividades de acção social para pessoas idosas, sem alojamento
-88102Actividades de acção social para pessoas com deficiência, sem alojamento88901Actividades de cuidados para crianças, sem alojamento88902Outras actividades de acção social, sem alojamento, n.e.90001Actividades das artes do espectáculo90002Actividades de apoio às artes do espectáculo90003Criação artística e literária90004Exploração de salas de espectáculos e actividades conexas91010Actividades das bibliotecas e arquivos91020Actividades dos museus e de gestão dos locais e monumentos históricos91030Actividades dos jardins botânicos e zoológicos, dos parques e reservas naturais92000Lotarias e Outros Jogos de Aposta93110Gestão de instalações desportivas93120Actividades dos clubes desportivos93190Outras actividades desportivas93210Actividades de parques de diversão e temáticos93290Outras actividades de diversão e recreativas, n.e.94110Actividades de organizações económicas e patronais94120Actividades de organizações profissionais94200Actividades de organizações sindicais94910Actividades de organizações religiosas94920Actividades de organizações políticas94990Outras actividades associativas, n.e.95110Reparação de computadores e de equipamento periférico95120Reparação de equipamento de comunicação95210Reparação de televisores e de outros bens de consumo similares95220Reparação de electrodomésticos e de outros equipamentos de uso doméstico e para jardim95230Reparação de calçado e de artigos de couro95240Reparação de mobiliário e similares de uso doméstico95291Reparação de relógios e de artigos de joalharia95292Reparação de outros bens de uso pessoal e doméstico, n.e.
-
-96010Lavagem e limpeza a seco de têxteis e peles96020Actividades de salões de cabeleireiro e institutos de beleza96030Actividades funerárias e conexas96090Outras actividades de serviços pessoais, n.e.97000Actividades das Famílias Empregadoras de Pessoal Doméstico98100Actividades de produção de bens pelas famílias para uso próprio98200Actividades de produção de serviços pelas famílias para uso próprio99000Actividades dos organismos internacionais e outras instituições extra-territoriais
-
-
-9.6 Tabela de Verbas e Taxas de Imposto de Selo
-
-
-Nº VerbaActos/ Documentos/ Contratos/ Operações/ TítulosTaxa1Aquisição onerosa ou gratuita do direito de propriedade ou de figuras parcelares desse direito, sobre imóveis, bem como a resolução, invalidade ou extinção, por mútuo
-consenso, dos respectivos contratos - sobre o valor.0,3%2Arrendamento e subarrendamento2.1Sobre o valor, aumento da renda ou prorrogação do contrato de arrendamento e subarrendamento para fins habitacionais.0,1%2.2Sobre o valor, aumento da renda ou prorrogação do contrato de arrendamento e
-subarrendamento destinados a estabelecimento comercial, industrial, exercício de profissão em regime independente.0,4%3Autos e termos efectuados perante tribunais e serviços, estabelecimentos e organismos do Estado, ainda que personalizados, incluindo os institutos públicos que compreendem arrendamento ou licitação de bens imóveis, cessão, conferência de interessados em que se concorde na adjudicação de bens comuns, confissão de divida, fiança, hipoteca, penhor, responsabilidade por perdas e danos e transacções - por cada um.1.000,00 Kz4Cheques de qualquer natureza - por cada dez.100,00 Kz5Depósito civil, qualquer que seja a sua forma - sobre o respectivo valor.0,1%6Depósito, em qualquer serviço público, dos estatutos de associações e outras instituições cuja constituição dele dependa - por cada.4.400,00 Kz7Actos societários:7.1Constituição de uma sociedade - sobre o valor real dos bens de qualquer natureza entregues ou a entregar pelos sócios após dedução das obrigações assumidas e dos
-encargos suportados pela sociedade em consequência de cada entrada.0,1%7.2Transformação em sociedade, associação ou pessoa colectiva que não seja sociedade de capitais - sobre o valor real dos bens de qualquer natureza pertencentes à sociedade à data da transformação após dedução das obrigações e encargos que a onerem nesse momento.0,1%
-7.3 Aumento do capital social de uma sociedade mediante a entrada de bens de qualquer espécie - sobre o valor real dos bens de qualquer natureza entregues ou a entregar pelos sócios após dedução da obrigação assumidas e dos encargos suportados pela sociedade em consequência de cada entrada.
-7.4 Aumento do activo de una sociedade mediante a entrada de bens de qualquer espécie remunerada não por partes representativas do capital social ou do activo, mas por direito da mesma natureza que os dos sócios, tais como direito de voto e participação nos lucros ou no saldo de liquidação - sobre o valor real dos bens de qualquer natureza entregues ou a entregar pelos sócios após dedução das obrigações assumidas e dos encargos suportados pela sociedade em consequência de cada entrada.
-8 Outros Contratos não especialmente previstos nesta tabela, incluindo os efectuados perante entidades públicas - por cada um.
-9 Exploração, pesquisa e prospecção de recursos geológicos integrados no domínio público do Estado - por cada contrato administrativo.
-
-0,1%
-
-
-
-0,1%
-
-
-
-
-
-1.000,00 Kz
-
-3.000,00 Kz
-
-
-
-10.1 Garantias de prazo inferior a um ano.	0,3%
-
-10.2 Garantias de prazo igual ou superior a um ano.	0,2%
-
-10.3 Garantias sem prazo ou de prazo igual ou superior a cinco anos.	0,1%
-
-11 Cada aposta de jogos, designadamente as representadas por bilhetes, boletins, cartões, matrizes, rifas ou tômbolas.
-11.1 Ingressos em salas de jogo de fortuna ou azar, ou documentos equivalentes, ainda que não seja devido o respectivo preço pelo cliente e mesmo que o pagamento do acesso seja dispensado pelas empresas concessionárias.
-
-100,00 Kz
-
-100,00 Kz
-
-
-12.1 Para instalação ou exploração de máquinas electrónicas de diversão	1.300,00 Kz
-
-12.2 Para quaisquer outros jogos legais - por cada um.	1.300,00 Kz
-
-12.3.1.1 Em Luanda	53.000,00 Kz
-
-12.3.1.2 Restantes capitais de província e no Lobito	27.000,00 Kz
-
-12.3.1.3 Outras localidades	14.000,00 Kz
-
-12.3.2.1 Em Luanda	6.000,00 Kz
-
-12.3.2.2 Restantes capitais de província e no Lobito	3.000,00 Kz
-
-12.3.2.3 Outras localidades	1.500,00 Kz
-
-12.3.3.1 Em Luanda	1.500,00 Kz
-
-12.3.3.2 Restantes capitais de província e no Lobito	1.000,00 Kz
-
-12.3.3.3 Outras localidades	500,00 Kz
-
-
-12.4Para hotelaria e similares:12.4.11º Categoria ou luxo (pelo menos 4 ou mais estrelas)100.000,00 Kz12.4.22º Categoria (3 estrelas)60.000,00 Kz12.4.3Restantes:12.4.3.1Luanda53.000,00 Kz12.4.3.2Restantes capitais de província e no Lobito30.000,00 Kz12.4.3.3Outras localidades15.000,00 Kz12.5Para as instalações de máquinas automáticas de venda de bens ou serviços em locais de
-acesso público - por cada máquina3.000,00 Kz12.6Outras licenças não designadas especialmente nesta tabela, concedidas pelo Estado,
-pelas Províncias, ou qualquer dos seus serviços, estabelecimentos, organismos ou institutos - por cada uma.2.000,00 Kz13Marcas e patentes - sobre o registo unitário.3.000,00 Kz14Notariado e actos notariais14.1Escrituras, excluindo as que tenham por objecto os actos referidos na verba 8 da tabela.2.000,00 Kz14.2Habilitação de herdeiros e de legatários - por cada acto.1.000,00 Kz14.3Testamento público ou cerrado1.000,00 Kz14.4Procurações e outros instrumentos de representação voluntária, incluindo os mandatos
-e substabelecimentos:14.4.1Procurações e outros instrumentos relativos a atribuição de poderes de representação
-voluntária - por cada um14.4.1.1Com poderes para gerência comercial1.000,00 Kz14.4.1.2Com quaisquer outros poderes500,00 Kz14.4.1.3Substabelecimento por cada um500,00 Kz14.5Registo de documentos apresentados aos notários para ficarem arquivados - por cada
-registo100,00 Kz14.6Outros instrumentos notariais avulsos, não especialmente previsto nesta Tabela - por
-cada um100,00 Kz15Operações aduaneiras:15.1Sobre o valor aduaneiro da importação1%15.2Sobre o valor aduaneiro das exportações:0,5%15.2.2Exportações de marfins e seus pelos e desperdícios, Marfim, osso, carapaça de
-tartaruga, Chipre, coral, madrepérol e outras matérias animais para entalhar, trabalhados e suas obras (incluindo as obras obtidas por moldagem); De peles com pêlo em bruto; peles de vision, inteiras mesmo sem cabeça, cauda ou patas; Peles de cordeiro denominadas astraçã, Breitsclnvanz, caracul, persianer ou semelhantes, de cordeiros da Índia, da China, da Mongólia ou do Tibete, de raposas e de outros animais, inteiras mesmo sem cabeça, cauda ou patas; Peles com pelo curtidas ou, acabadas (incluindo as cabeças, caudas, patas e outras partes, desperdícios e aparas), montadas ou não, sem adição de outras matérias; Vestuário e seus acessórios e outros artefactos de peles com pelo; Peles com pelos artificiais e suas obras;0,5%16Operações de financiamento:16.1Pela utilização de créditos, sob a forma de fundos, mercadorias e outros valores em
-virtude da concessão de crédito a qualquer título, incluindo o crédito documentário, a cessão de créditos, factoring e as operações de tesouraria quando envolvam qualquer tipo de financiamento, salvo, em qualquer circunstância, as emissões de títulos de dívida de organismos admitidos a negociação no mercado regulamentado, considerando-se em caso de prorrogação do prazo do contrato, que o imposto é
-recalculado em função da duração total do contrato e deduzido do montante
-anteriormente liquidado - sobre o respectivo valor, em função do prazo:16.1.1Crédito de prazo igual ou inferior a um ano.0,5%16.1.2Crédito de prazo superior a um ano.0,4%16.1.3Crédito de prazo igual ou superior a cinco anos.0,3%16.1.4Crédito utilizado sob a forma de conta corrente, descoberto bancário ou qualquer outra
-forma em que o prazo de utilização não seja determinado ou determinável, sobre a média mensal obtida através da soma dos saldos em dívida apurados diariamente, durante o mês dividido por 30.0,1%16.1.5Crédito habitação, sobre o valor.0,1%16.2Operações realizadas por ou com intermediação de instituições de crédito, sociedades
-financeiras ou outras entidades a elas legalmente equiparadas e quaisquer outras instituições financeiras - sobre o valor cobrado:16.2.1Juros por, designadamente, desconto de letras e por empréstimos, por contas de
-créditos e por créditos sem liquidação.0,2%16.2.2Prémios e juros por letras tomadas, de letras a receber por conta alheia, saque emitidos
-sobre ou de qualquer transferência0,5%16.2.3Comissões por garantias prestadas.0,5%16.2.4Outras comissões e contraprestações por serviços financeiros, incluindo comissões pela
-angariação de créditos e garantias intermediadas por entidades não financeiras.0,7%16.3Outras operações:16.3.1Saque sobre o estrangeiro, guias emitidas, ouro e fundos públicos ou títulos negociáveis
-vendidos, sobre o respectivo valor.1%16.3.2Títulos de divida pública, emitidos por governos estrangeiros, quando sejam postos a
-venda no País - sobre o valor nominal.0,5%16.3.3Câmbio de notas em moedas estrangeiras, conversão de moeda nacional em moeda
-estrangeira a favor de pessoas singulares.0,1%17Operações de locação financeira17.1Operações de locação financeira de bens imóveis, sobre o montante da
-contraprestação:0,3%17.2Operações de locação financeira e operacional de bens móveis corpóreos, integrando a
-manutenção e a assistência técnica, sobre o montante da contraprestação0,4%18Precatórios ou mandados para levantamento e entrega de dinheiro ou valores
-existentes:
-Sobre a importância a levantar ou a entregar0,1%19Publicidade:19.1Cartazes ou anúncios afixados ou expostos em suportes fixos ou móveis na via pública
-ou destinados a serem vistos na via pública que façam propaganda de produtos, serviços ou de qualquer indústria, comerciais ou divertimentos com exclusão dos identificativos do próprio estabelecimento comercial onde se encontrem afixados - por cada metro quadrado ou fracção e em cada ano civil1.000,00 Kz19.2Publicidade feita em revista, jornais, catálogos, programas radiofónicos ou televisivos,
-reclamos, etiquetas e outros impressos que se destinem à distribuição pública (por cada edição de 1000 exemplares) ou fracção25.000,00 Kz20Registos e averbamentos em conservatórias de bens móveis
-
-20.1	Aeronaves45.000,00 Kz20.2	Barcos23.000,00 Kz20.3	Motas de água18.000,00 Kz20.4	Motociclos, veículos ligeiros e mustos de passageiros e veículos pesados, excepto
-ambulâncias e carros funerários:5.000,00 Kz20.4.1	Novos e até 3 anos7.000,00 Kz20.4.2	Usados com mais de 3 anos0,5%21	Reporte - sobre o valor contrato22	Seguros: Apólice de seguros, sobre a soma dos prémios do seguro, do custo da apólice e de quaisquer outras importâncias que constituam receita das empresas
-seguradoras, cobradas juntamente com esse prémio ou em documento separado:22.1.1	Seguro do ramo caução0,3%22.1.2	Seguro do ramo marítimo e fluvial que inclui transporte, embarcações e
-responsabilidade civil.0,3%22.1.3	Seguro do ramo aéreo que inclui aeronave, responsabilidade civil mercadorias e pessoas
-transportadas0,2%22.1.4	Seguro do ramo mercadorias transportadas, não previstas nos ramos marítimos, fluviais e aéreos0,1%22.1.5	Seguros de quaisquer outros ramos0,3%22.2	Comissões cobradas pela actividade de mediação, sobre o respectivo valor0,4%23	Títulos de crédito e recibos de quitação:23.1	Letras e livranças - sobre o respectivo valor, com o mínimo de Kz: 100,000,1%23.2	Ordens e escritos de qualquer natureza, com exclusão dos cheques, nos quais se determine pagamento ou entrega de dinheiro com cláusulas à ordem ou a disposição, ainda que sob a forma de correspondência - sobre o respectivo valor, com o mínimo de
-Kz: 100,00.0,1%23.3	Recibo de quitação pelo efectivo recebimento de créditos resultantes do exercício da actividade comercial ou industrial, em dinheiro ou em espécie, com excepção dos
-resultantes exclusivamente do arrendamento habitacional feito por pessoas singulares1%23.4	Abertura de crédito, por escrito particular ou instrumento público0,1%24	Transferências onerosas de actividades ou de exploração de serviços:24.1	Trespasse ou cessão para exploração de estabelecimento comercial, industrial ou
-agrícola - sobre o seu valor0,2%24.2	Subcomissões e trespasses de concessões feitos pelo Estado e pelas províncias para exploração de empresas ou de serviços de qualquer natureza tenha ou não principiado
-a exploração - sobre seu valor0,2%
-
-
-
-
-9.7 Tabela de Taxas do Imposto Especial de Consumo
-
-Classificação PautalDesignaçãoUnidade de MedidaIEC (%)2202.10.00Águas, incluídas as águas minerais e as águas gaseificadas, adicionadas de
-açúcar ou de outros edulcorantes ou aromatizadasLITRO (Lt)32202.91.00Cerveja sem álcoolLITRO (Lt)42202.99.00OutrasLITRO (Lt)42203.00.00Cerveja de malteLITRO (Lt)4
-2204.10.10ChampanheLITRO (Lt)82204.10.90OutrosLITRO (Lt)82204.21.00Em recipientes de capacidade não superior a 2LLITRO (Lt)82204.22.00Em recipientes de capacidade superior a 2 l, mas não superior a 10 lLITRO (Lt)82204.29.00OutrosLITRO (Lt)82205.10.00Em recipientes de capacidade não superior a 2LLITRO (Lt)82205.90.00OutrosLITRO (Lt)8
-2206.00.00Outras bebidas fermentadas (por exemplo, sidra, perada, hidromel); mistura de bebidas fermentadas e misturas de bebidas fermentadas com bebidas não alcoólicas, não especificadas nem compreendidas noutras
-posições.
-LITRO (Lt)
-82207.10.00Álcool etílico não desnaturado, com um teor alcoólico, em volume, igual
-ou superior a 80% vol.LITRO (Lt)152207.20.10Álcool etílicoLITRO (Lt)152207.20.19OutrosLITRO (Lt)152208.20.00Aguardentes de vinho ou de bagaço de uvasLITRO (Lt)82208.30.00UísquesLITRO (Lt)82208.40.00Rum e outras aguardentes provenientes da destilação, após fermentação,
-de produtos da cana-de-açúcarLITRO (Lt)82208.50.00Gin e genebraLITRO (Lt)82208.60.00VodcaLITRO (Lt)82208.70.00LicoresLITRO (Lt)82208.90.00OutrosLITRO (Lt)82401.10.00Tabaco não destaladoKILOGRAMA (Kg)252401.20.00Tabaco total ou parcialmente destaladoKILOGRAMA (Kg)252401.30.00Desperdícios de tabacoKILOGRAMA (Kg)252402.10.00Charutos e cigarrilhas, que contenham tabacoKILOGRAMA (Kg)252402.20.00Cigarros que contenham tabacoKILOGRAMA (Kg)252402.90.00OutrosKILOGRAMA (Kg)252403.11.00Tabaco para cachimbo de água (narguilé) mencionado na Nota 1 de
-subposição do presente CapítuloKILOGRAMA (Kg)252403.19.00OutrosKILOGRAMA (Kg)252403.91.00Tabaco "homogeneizado" ou "reconstituído"KILOGRAMA (Kg)252403.99.00OutrosKILOGRAMA (Kg)253604.10.00Fogo de ArtificioKILOGRAMA (Kg)193923.21.10Sacos de quaisquer dimensões destinados exclusivamente para embalar
-produtos, excepto os de transporte.KILOGRAMA (Kg)23923.21.90OutrosKILOGRAMA (Kg)193923.29.10Sacos de quaisquer dimensões destinados exclusivamente para embalar
-produtos, excepto os de transporte.KILOGRAMA (Kg)23923.29.90OutrosKILOGRAMA (Kg)193926.90.90Outras (palhinhas de plástico).KILOGRAMA (Kg)19
-4012.11.00Do tipo utilizado em automóveis de passageiros (incluindo os veículos de uso misto (stations wagons) e os automóveis de corrida)UNIDADE/QUANTIDADE (U
-ou Qtd)
-19
-4012.12.00Do tipo utilizado em autocarros ou camiõesUNIDADE/QUANTIDADE (U
-ou Qtd)194012.13.00Do tipo utilizado em veículos aéreosUNIDADE/QUANTIDADE (U
-ou Qtd)194012.19.00OutrosUNIDADE/QUANTIDADE (U
-ou Qtd)194012.20.00Pneumáticos usadosUNIDADE/QUANTIDADE (U
-ou Qtd)194012.90.00OutrosKILOGRAMA (Kg)19
-7113.11.00De prata, mesmo revestida, folheada ou chapeada, de outros metais preciosos
-KILOGRAMA (Kg)
-157113.19.00De outros metais preciosos, mesmo revestidos, folheados ou chapeados,
-de metais preciososKILOGRAMA (Kg)157113.20.00De metais comuns, folheados ou chapeados de metais preciososKILOGRAMA (Kg)157114.11.00De prata, mesmo revestida, folheada ou chapeada de outros metais
-preciososKILOGRAMA (Kg)157114.19.00De outros metais preciosos, mesmo revestidos, folheados ou chapeados,
-de metais preciososKILOGRAMA (Kg)157114.20.00De metais comuns, folheados ou chapeados de metais preciososKILOGRAMA (Kg)158703.24.49Outros - NovosUNIDADE/QUANTIDADE (U
-ou Qtd)58703.24.59Outros - UsadosUNIDADE/QUANTIDADE (U
-ou Qtd)58703.33.59Outros NovosUNIDADE/QUANTIDADE (U
-ou Qtd)58703.33.69Outros UsadosUNIDADE/QUANTIDADE (U
-ou Qtd)58704.21.10Do tipo Pickup e Furgão, de cilindrada não superior a 5000 cm3 - NovosUNIDADE/QUANTIDADE (U
-ou Qtd)58704.21.11Do tipo Pickup e Furgão, de cilindrada superior a 5000 cm3 - NovosUNIDADE/QUANTIDADE (U
-ou Qtd)58704.21.15Do tipo Pickup e Furgão, de cilindrada não superior a 5000 cm3 - UsadosUNIDADE/QUANTIDADE (U
-ou Qtd)58704.21.16Do tipo Pickup e Furgão, de cilindrada superior a 5000 cm3 - UsadosUNIDADE/QUANTIDADE (U
-ou Qtd)58801.00.00Balões e dirigíveis; planadores, asas voadoras e outros veículos aéreos,
-não concebidos para propulsão a motorKILOGRAMA (Kg)208802.11.00De peso não superior a 2.000 kg, sem carga (vazios)UNIDADE (U)208802.20.00Aviões e outros veículos aéreos, de peso não superior a 2.000 kg, sem
-carga (vazios)UNIDADE (U)208903.91.00Barcos à vela, mesmo com motor auxiliarUNIDADE/QUANTIDADE (U
-ou Qtd)208903.92.00Barcos a motor, excepto com motor fora-de-bordaUNIDADE/QUANTIDADE (U
-ou Qtd)208903.99.90OutrosUNIDADE/QUANTIDADE (U
-ou Qtd)209303.20.00Outras espingardas e carabinas de caça ou de tiro ao alvo, com pelo
-menos um cano lisoUNIDADE/QUANTIDADE (U
-ou Qtd)509303.30.00Outras espingardas e carabinas de caça ou de tiro ao alvoUNIDADE/QUANTIDADE (U
-ou Qtd)509701.10.00Quadros, pinturas e desenhosUNIDADE (U)59701.90.00OutrosKILOGRAMA (Kg)59702.00.00Gravuras, estampas e litografias, originaisUNIDADE (U)59703.00.00Produções originais de arte estatuaria ou de escultura, de quaisquer
-matériasUNIDADE (U)5
-9704.00.00Selos postais, selos fiscais, marcas postais, envelope de primeiro dia (First Day Covers), inteiros postais e semelhantes, obliterados ou não obliterados, excepto os artigos da posição 49.07
-KILOGRAMA (Kg)
-5
-
-9705.00.00Colecções e espécimes para colecções, de zoologia, botânica, mineralogia, anatomia, ou apresentando interesse histórico, arqueológico, paleontológico, etnográfico ou numismático
-KILOGRAMA (Kg)
-59706.00.00Antiguidades com mais de 100 anosKILOGRAMA (Kg)5
-
-2701.11.00
-
-AntraciteTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2701.12.00
-
-Hulha betuminosaTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2701.19.00
-
-Outras hulhasTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2701.20.00
-Briquetes, bolas em aglomerados e combustíveis sólidos semelhantes, obtidos a partir da hulhaTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2702.10.00
-
-Linhites, mesmo em pó, mas não aglomeradasTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2702.20.00
-
-Linhites aglomeradasTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2704.00.00
-Coques e semicoques, de hulha, de linhite ou de turfa, mesmo aglomerados; carvão de retortaTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2705.00.00
-Gás de hulha, gás de água, gás pobre (gás de ar) e gases semelhantes, excepto gases de petróleo e outros hidrocarbonetos gasososTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2706.00.00
-Alcatrões de hulha, de linhite ou de turfa e outros alcatrões minerais, mesmo desidratados ou parcialmente destilados, incluindo os alcatrões reconstituídos.TONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2707.10.00
-
-Benzol (benzeno)TONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2707.20.00
-
-Toluol (tolueno)TONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2707.30.00
-
-Xilol (xilenos)TONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-
-2707.40.00
-
-NaftalenoTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2707.50.00
-Outras misturas de hidrocarbonetos aromáticos que destilem (incluindo as perdas) uma fração igual ou superior a 65 %, em volume, a 250ºC, segundo o método ISO 3405 (equivalente ao método ASTM D 86)TONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2707.91.00
-
-Óleos de creosotoTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2707.99.00
-
-OutrosTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2708.10.00
-
-BreuTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2708.20.00
-
-Coque de breuTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2710.12.11
-
-Gasolina para aviõesTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2710.12.12
-
-Outras GasolinasTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-5
-
-2710.12.13
-
-QueroseneTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-0
-
-2710.12.14
-
-GasóleoTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-5
-
-2710.12.15
-
-OutrosTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2710.19.21
-
-Óleo baseTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2710.19.23
-
-Óleos lubrificantesTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-
-2710.19.29
-
-OutrosTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2710.20.00Óleos de petróleo ou de minerais betuminosos (excepto óleos brutos) e preparações não especificadas nem compreendidas noutras posições, que contenham, como constituintes básicos, 70 % ou mais, em peso, de óleos de petróleo ou de minerais betuminosos; que contenham 1 biodiesel,
-excepto os resíduos de óleosTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2710.91.00
-Que contenham difenilos policlorados (PCB), terfenilos policlorados (PCT) ou difenilos polibromados (PBB)TONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2710.99.00
-
-OutrosTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2711.12.00
-
-PropanoTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2711.13.00
-
-ButanoTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-0
-
-2711.14.00
-
-Etileno, propileno, butileno e butadienoTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2711.19.00
-
-OutrosTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2712.10.00
-
-VaselinaTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2712.20.00
-
-Parafina que contenha, em peso, menos de 0,75 % de óleoTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2712.90.00
-
-OutrosTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2713.11.00
-
-Não calcinadoTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2713.12.00
-
-CalcinadoTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-
-
-2713.20.00
-
-Betume de petróleoTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2713.90.00
-
-Outros resíduos dos óleos de petróleo ou de minerais betuminososTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2714.10.00
-
-Xistos e areias betuminososTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2714.90.10
-
-Aditivos de xistos e areias betuminososTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2714.90.90
-
-OutrosTONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-2715.00.00
-Misturas betuminosas à base de asfalto ou de betume naturais, de betume de petróleo, de alcatrão mineral ou de breu de alcatrão mineral (por exemplo, mástiques betuminosas e cut-backs)TONELADAS	MÉTRICAS (TM)
-KILOGRAMAS (Kg) METROS CÚBICOS (m3)
-LITROS (Lt ou Lts)
-
-2
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -1,0 +1,3444 @@
+OUM 
+DS.120 DESIGN SERVICES CONSTRUCTION 
+ 
+Especificação Técnica de Serviço 
+FE – Facturação Eletrónica 
+ 
+ 
+Data de Criação: 
+Outubro 01, 2025 
+Última Actualização: 
+Novembro 06, 2025 
+Referência: ENTIDADES EXTERNAS 
+
+ DS.120      
+ 
+Controle do Documento     ii 
+1 
+Controle do Documento 
+1.1 Histórico de Alterações 
+4 
+Data 
+Autor 
+Versão 
+Comentários 
+01/10/2025 
+Francisco André 
+Miguel 
+1.0 
+Criação do Documento. 
+05/10/2025 
+Nzunzi António 
+1.0 
+Ajustes no Documento 
+05/10/2025 
+Osvaldo Domingos 
+1.0 
+Ajustes no Documento 
+06/11/2025 
+Osvaldo Domingos 
+1.1 
+Actualização das operações 
+ 
+1.2 Revisores 
+ 
+Nome 
+Cargo 
+Eduardo Cordeiro Alves 
+Lider de Equipa de Integração de Sistemas 
+ 
+ 
+ DS.120      
+ 
+Controle do Documento     iii 
+Conteúdo 
+1 
+Controle do Documento............................................................................................. ii 
+1.1 
+Histórico de Alterações................................................................................................. ii 
+1.2 
+Revisores ...................................................................................................................... ii 
+2 
+Introdução .................................................................................................................... i 
+3 
+Escopo ......................................................................................................................... ii 
+3.1 
+Objectivo ....................................................................................................................... ii 
+3.2 
+Definições, Acrônicos e Abreviaturas ............................................................................ i 
+3.3 
+Referências ................................................................................................................... i 
+4 
+Serviços ....................................................................................................................... ii 
+4.1 
+Solicitar Registo de Fatura Electrónica ........................................................................ ii 
+4.2 
+Obter Estado de Validação da Factura ......................................................................... i 
+4.3 
+Listar Facturas .............................................................................................................. v 
+4.4 
+Consultar Facturas ...................................................................................................... ix 
+4.5 
+Solicitar Série ............................................................................................................ xix 
+4.6 
+Listar Séries .............................................................................................................. xxv 
+4.7 
+Validar Documento .................................................................................................. xxxi 
+4.8 
+Tipo de Processamento.......................................................................................... xxxv 
+5 
+Tabelas de Refêrencias.............................................................................................. 2 
+5.1 
+Códigos dos Erros ........................................................................................................ 2 
+6 
+Gerenciamento e Registro ......................................................................................... 3 
+6.1 
+Monitoramento e Execução de SLA ............................................................................. 3 
+6.2 
+Gerenciamento de Exceção ......................................................................................... 3 
+6.3 
+Logging ......................................................................................................................... 3 
+7 
+Infra-Estrutura ............................................................................................................. 4 
+7.1 
+Infra Necessária ........................................................................................................... 4 
+7.2 
+Deploy/Instalação ......................................................................................................... 4 
+8 
+Pendências .................................................................................................................. 5 
+8.1 
+Abertas ......................................................................................................................... 5 
+8.2 
+Fechadas ...................................................................................................................... 5 
+9 
+Anexos ......................................................................................................................... 6 
+9.1 
+Tabela de Isenções de IVA ................................................................................................ 6 
+9.2 
+Tabela de Isenções de IS .................................................................................................. 8 
+9.3 
+Tabela de Isenções de IEC ................................................................................................ 8 
+9.4 
+Códigos e mensagens de erro no retorno do Serviço .......................................................... 9 
+9.5 
+Códigos de Actividade Econónica - CAE ........................................................................... 11 
+9.6 
+Tabela de Verbas e Taxas de Imposto de Selo .................................................................. 31 
+ 
+ DS.120      
+ 
+Controle do Documento     iv 
+9.7 
+Tabela de Taxas do Imposto Especial de Consumo ........................................................... 35 
+ 
+ 
+ DS.120      
+ 
+Introdução     i of 92 
+2 
+Introdução 
+Este documento tem como objectivo apresentar a estratégia de análise técnica de integração através de uma 
+visão lógica de componentes e de infraestrutura, tomando como base a especificação funcional da 
+integração fornecida. Descreve também as estruturas de dados de entrada/saída das interfaces, quais suas 
+políticas de segurança, suas características e limitações e tecnologias utilizadas na implementação. As 
+informações contidas neste documento servem de referência para as equipes de desenvolvimento alinhar o 
+entendimento da arquitectura macro estabelecida para o processo de integração. 
+ 
+ 
+ DS.120      
+ 
+Escopo     ii of 92 
+3 
+Escopo 
+O serviço foi criado para permitir consulta de dados do contribuinte. 
+O serviço será disponibilizado para consumo de duas maneiras:  
+• 
+WebService SOAP disponibilizado no barramento de serviço OSB via proxy service HTTPS com 
+autenticação de segurança via OWSM. 
+• 
+WebService REST disponibilizado no barramento de serviço OSB via proxy service HTTPS com 
+autenticação de segurança via OWSM.
+
+3.1 Objectivo 
+O principal objectivo desta integração é transformar a forma como as transações comerciais são reportadas 
+e fiscalizadas, promovendo maior transparência, eficiência e justiça fiscal.  
+ 
+A especificação técnica detalha:  
+ 
+• 
+Os serviços expostos e consumidos;  
+• 
+Os formatos e estrutura de dados (Payloads JSON);  
+• 
+Os campos obrigatórios e suas regras de validação;  
+• 
+Os requisitos de autenticação e segurança.  
+ 
+Este documento destina-se a equipes técnicas, analistas de integração, desenvolvedores e arquitectos de 
+sistemas, servindo como referência para implementação, testes e manutenção dos serviços descritos.  
+  
+No esquema seguinte estão representadas as interacções previstas entre os vários intervenientes do 
+processo de adesão à facturação electrónica bem como comunicação e consulta das facturas electrónicas 
+propriamente ditas.  
+ 
+ 
+ 
+ DS.120      
+ 
+Escopo     i of 92 
+3.2 Definições, Acrônicos e Abreviaturas 
+Tecnologia: 
+• 
+A interface será construída utilizando o conceito de Arquitectura Baseado em Serviço (SOA); 
+ 
+BPEL PM (BPEL) 
+Business Process Execution Language Process Manager é o padrão para uma linguagem 
+executável que permite especificar mecanismos de interação utilizando Web Services. BPEL PM 
+é o produto Oracle (BPEL Process Manager) responsável por executar programas na linguagem 
+BPEL. 
+CAE 
+Código de Actividade Económica é o código da actividade que a entidade está autorizada a 
+executar 
+Endpoint 
+É o endereço físico de um provedor ou consumidor de serviço. No caso de uma interface 
+exposta pelo Service Bus, indica o caminho relativo dentro daquele ambiente. Quando o 
+endPoint é cadastrado em um Business Service, indica o caminho completo do provedor de 
+serviço (“http://osb.minfin.co.ao/taxa”, por exemplo). 
+ESS 
+Enterprise Scheduler Service, funcionalidade do fusion application para scheduler de 
+aplicações. 
+MDS 
+Sigla de MetaData Service, banco de dados utilizado pela plataforma SOA para retenção de 
+informações – composites instalados, fault policies, XML schemas, WSDLs, entre outros. 
+OSB 
+Oracle Service Bus - Barramento de serviços da Oracle 
+OWSM 
+Oracle Web Services Manager, produto do pacote SOA Suite que oferece uma estrutura para 
+gerenciamento de políticas de segurança de serviços de forma centralizada. 
+Pipeline 
+Agrupa os stages dentro de um proxy, separando-os em pipeline de request e response – as 
+ações do pipeline de request são executadas antes da chamada ao provedor de serviço 
+(validação e transformação, por exemplo). No response pipeline podemos manipular a resposta 
+recebida do provedor de serviço, antes de enviá-la ao consumidor original. 
+Proxy Service 
+Um serviço exposto pelo barramento sempre será do tipo “proxy service”. O proxy é o ponto 
+onde as instruções necessárias para processamento de uma requisição de entrada são 
+codificadas – transformações e validações, por exemplo - dentro de seu pipeline (vide definição 
+acima).  
+SOA 
+Estratégia para a construção de sistemas de software com foco no negócio a partir de serviços 
+interoperáveis e com baixo acoplamento, que podem ser combinados e reutilizados de forma ágil 
+dentro ou entre corporações, para atender às necessidades de negócio. 
+SOAP 
+SOAP, definido como Simple Object Access Protocol, é a especificação de um protocolo para 
+troca de informações de forma estruturada, utilizado pelas implementações de Web Services. 
+SIFP 
+Sistema Integrado das Finanças Públicas 
+Transporte 
+É o termo utilizado para descrever a forma como uma requisição é recebida pelo barramento 
+quando expondo um proxy service, ou como ela deve ser enviada a um provedor de serviço no 
+caso de um business service. Alguns transportes entendidos pelo Service Bus: HTTP, JMS, EJB, 
+FTP. 
+Web Service 
+Sistema de software projetado para suportar interoperabilidade entre computadores através de 
+uma rede. 
+WSDL 
+Web Services Description Language (WSDL) é uma linguagem baseada em XML utilizada para 
+descrever Web Services funcionando como um contrato do serviço. Trata-se de um documento 
+escrito em XML que, além de descrever o serviço, especifica como acessá-lo e quais as 
+operações estão disponíveis. 
+ 
+ 
+ DS.120      
+ 
+Escopo     i of 92 
+ 
+3.3 Referências 
+ 
+Documento 
+URL 
+EA-075_SOA_REFERENCE_ARCHITECTURE 
+ 
+TA-010_SOA_TECHNICAL_GUIDE 
+ 
+ISIGT - Levantamento das informações dos Serviços 
+ 
+ESPECIFICAÇÃO TÉCNICA DOS SERVIÇOS – FE (AGT) 
+ 
+ 
+ 
+ 
+ DS.120      
+ 
+Serviços     ii of 92 
+4 
+Serviços 
+
+4.1 Solicitar Registo de Fatura Electrónica 
+ 
+4.1.1 Interface do Serviço 
+ 
+ DS.120      
+ 
+Serviços     iv of 92 
+
+REST 
+
+Endpoint: https://sifphml.minfin.gov.ao/sigt/fe/v1/registarFactura  
+ 
+Request Exemplo (Accept: application/json): 
+ 
+{ 
+  "schemaVersion": "string", 
+  "submissionUUID": "string", 
+  "taxRegistrationNumber": "string", 
+  "submissionTimeStamp": "string”, 
+  "softwareInfo": { 
+    "softwareInfoDetail": { 
+      "productId": "string", 
+      "productVersion": "string", 
+      "softwareValidationNumber": "string" 
+    }, 
+    "jwsSoftwareSignature": "string" 
+  }, 
+  "numberOfEntries": "string", 
+  "documents": [ 
+    { 
+      "documentNo": "string", 
+      "documentStatus": "string", 
+      "jwsDocumentSignature": "string", 
+      "documentDate": "string", 
+      "documentType": "string", 
+      "eacCode": "string", 
+      "systemEntryDate": "string", 
+      "customerTaxID": "string", 
+      "customerCountry": "string", 
+      "companyName": "string", 
+      "lines": [ 
+        { 
+          "lineNumber": "string" , 
+          "productCode": "string", 
+          "productDescription": "string", 
+          "quantity": "string", 
+          "unitOfMeasure": "string", 
+          "unitPrice": "string", 
+          "unitPriceBase": "string", 
+          "debitAmount": "string", 
+          "creditAmount": "string", 
+          "referenceInfo": { 
+                 "reference": "string" 
+                 "reason": "string" 
+                 "referenceItemLineNo": "string" 
+          } 
+          "taxes": [ 
+            {     
+              "taxType": "string", 
+              "taxCountryRegion": "string", 
+              "taxCode": "string", 
+              "taxPercentage":  "string",, 
+              "taxContribution":  "string", 
+            } 
+          ], 
+          "settlementAmount":  "string", 
+        } 
+      ], 
+      "paymentReceipt": { 
+        "sourceDocuments": [ 
+               { 
+                    "lineNo": "string" 
+                    "sourceDocumentID": { 
+                           "originatingON":   "string" 
+                           "documentDate": "string" 
+                    } 
+                    "debitAmount":  "string" 
+                    "creditAmount": "string" 
+               } 
+         ] 
+      }, 
+      "documentTotals": { 
+        "taxPayable":  "string", 
+        "netTotal": "string", 
+        "grossTotal": "string" 
+      }, 
+      "withholdingTaxList": [ 
+        { 
+          "withholdingTaxType": "string", 
+          "withholdingTaxDescription": "string", 
+          "withholdingTaxAmount": "string" 
+        } 
+      ] 
+    } 
+  ] 
+} 
+ 
+Response Exemplo: 
+ 
+{  
+    "requestID": "string",  
+    "errorList": [ 
+ 
+{  
+  "idError": " string ",  
+  "documentNo": " string ",  
+  "descriptionError": " string "  
+} 
+    ] 
+ 
+ }  
+ 
+4.1.2 
+Tipo de Comunicação 
+( X ) Síncrono  
+(    ) Assíncrono 
+(    ) One Way 
+ 
+4.1.3 Protocolo de Transporte 
+HTTPS 
+ 
+4.1.4 Formato da Mensagem 
+SOAP e REST 
+ 
+4.1.5 Parâmetros de Cabeçalho
+
+Nome 
+
+Tipo 
+
+Obrigatório 
+
+Descrição 
+
+Username 
+
+String 
+
+S 
+
+Identificador do Usuário que invocou o serviço.
+ 
+Password 
+
+String 
+
+S 
+
+Token de acesso ao serviço. 
+ ----------------------------------------------------------------------------------
+                         4.1.6 Parâmetros de Entrada 
+
+Nome        Tipo        Obrigatório        Descrição
+
+schemaVersion
+ 
+String  
+S 
+Versão do schema do serviço, exemplo “1.0” 
+--------------------------------------------------------------------------------
+submissionUUID
+
+String 
+S 
+Identificador (GUID ou UUID) da solicitação 
+fornecido pelo software, no formato standard 
+“xxxxxxxx-xxxx-Mxxx-Nxxx-xxxxxxxxxxxx” em 
+que:  
+• 
+Cada x é um dígito hexadecimal (0–9, a–f);  
+M indica a versão do UUID (por exemplo, 4 para 
+UUID versão 4 — aleatório); 
+ 
+N indica o variant (especifica o layout; para UUIDs 
+compatíveis com RFC 4122, os primeiros bits 
+de N devem estar entre 8 e b).  
+Exemplo:  
+550e8400-e29b-41d4-a716-446655440000  
+  
+Este identificador deverá ser único por contribuinte 
+emissor. 
+-------------------------------------------------------------------------------
+taxRegistrationNumber 
+String 
+S 
+Número fiscal de contribuinte.
+--------------------------------------------------------------------------
+submissionTimeStamp
+
+String 
+S 
+Timestamp de submissão do pedido no formato 
+ISO 8601, exemplos:  
+• 
+"2025-05-27T14:30:00Z" (em UTC);  
+"2025-05-27T14:30:00-03:00" (com informação de 
+timezone). 
+-------------------------------------------------------------------------
+softwareInfo 
+Objecto 
+S 
+Objecto com os dados do Software de Facturação.  
+                    softwareInfoDetail 
+Objecto 
+S 
+Objecto com os detalhes do Software de 
+Facturação 
+                                                  productId 
+String 
+S 
+Nome do Software de Facturação. 
+                                                  productVersion 
+String 
+S 
+Versão do Software de Facturação. 
+                                                 softwareValidationNumber 
+String 
+S 
+Número de Certificação do Software de 
+Facturação. 
+ ----------------------------------------------------------------------------------------
+ 
+jwsSoftwareSignature
+
+String 
+S 
+Assinatura digital do Software de Facturação 
+usando a chave privada do software, através o 
+algoritmo RS256  
+(RSA  
++  
+SHA-256).   
+Todos os campos do objecto softwareInfo devem 
+ser usados na assinatura.   
+--------------------------------------------------------------------------------------------
+numberOfEntries
+ 
+String 
+S 
+Número de facturas que constam na chamada ao 
+serviço. 
+documents 
+Array 
+S 
+Array com a lista de facturas (object document) 
+Prevê-se um máximo de 30 facturas. 
+                     documentNo 
+String 
+S 
+Identificação única do documento, gerado pelo 
+Software de Facturação de documentos em 
+conformidade com o documento SAF-T(AO).  
+• 
+Consiste de um código de documento 
+interno - espaço - número de série do 
+documento -/- e um número sequencial 
+do documento para a sequência de 
+consentimento.
+---------------------------------------------------------- 
+documentStatus
+
+String 
+S 
+Estado actual do documento de facturação, com os 
+seguintes valores possíveis e significados:  
+N - Normal  
+S - Autofacturação  
+A - Anulado  
+R - Documento de resumo de outros 
+documentos criados noutras aplicações e 
+gerado nesta aplicação  
+C – Documento gerado para correcção de 
+documento anteriormente gerado e rejeitado 
+pela AGT (identificado no campo 
+rejectedDocumentNo)
+-------------------------------------------------- 
+documentCancelReason
+ 
+String 
+N 
+Motivo de anulação do documento de facturação 
+de acordo com o previsto na legislação (nºs 8 e 9 
+do artº 8º do Decreto Presidencial 71/25), com os 
+seguintes valores possíveis e significados:   
+I – anulada por incorrecta identificação do 
+adquirente.  
+N – anulada por não ter sido enviado o 
+documento ao adquirente.  
+  
+O preenchimento deste campo é obrigatório 
+quando o estado do documento transmitido é 
+anulado (documentStatus = “A”). 
+----------------------------------------------------------
+rejectedDocumentNo 
+String 
+N 
+Identificação do número de  documento 
+previamente submetido à AGT e rejeitado por falta 
+de conformidade.  
+O preenchimento deste campo é obrigatório 
+quando a informação de estado do documento 
+transmitido é correcção (documentStatus = “C”). 
+O documento identificado nesta correcção será 
+verificado se corresponde a uma rejeição no 
+histórico de pedidos de registo de facturas 
+emitidas.
+----------------------------------------------------------
+jwsDocumentSignature
+
+String 
+S 
+Assinatura da factura, encriptação usando a chave 
+privada do emissor com os seguintes campos da 
+factura:   
+documentNo  
+taxRegistrationNumber  
+documentType  
+documentDate  
+customerTaxID  
+customerCountry  
+companyName  
+documentTotals
+--------------------------------------------------------------------  
+documentDate
+
+String 
+S 
+Data de emissão do documento, no formato 
+“AAAA-MM-DD” 
+------------------------------------------------------------
+documentType
+
+String 
+S 
+Tipo de documento de facturação electrónica, com 
+os seguintes valores possíveis e significados: 
+ 
+FA - Factura de Adiantamento 
+FT - Factura  
+FR - Factura/Recibo  
+FG - Factura Global  
+AC - Aviso de Cobrança  
+AR - Aviso de Cobrança/Recibo  
+TV - Talão de Venda  
+RC - Recibo Emitido  
+RG - Recibo  
+RE - Estorno ou Recibo de Estorno  
+ND - Nota de Débito   
+NC - Nota de Crédito  
+AF - Factura/Recibo de Autofacturação  
+RP - Prémio ou Recibo de Prémio  
+RA - Resseguro Aceite  
+CS - Imputação a Co-seguradoras   
+LD - Imputação a Co-seguradora Líder 
+------------------------------------------------------------------
+
+eacCode 
+String 
+N 
+Código de actividade que se relaciona com esta 
+factura (ver Anexo 9.5.)
+--------------------------------------------------------------
+
+systemEntryDate 
+String 
+N 
+Timestamp de gravação do registo no momento da 
+assinatura - formato ISO 8601 (YYYY-
+MMDDThh:mm:ss)
+----------------------------------------------------------
+
+customerTaxID 
+String 
+N 
+Número  de identificação do cliente da factura. 
+Para compradores domésticos (identificados com 
+AO no campo customerCountry) é preenchido 
+com o NIF em Angola.  
+Para documentos de facturação de contribuintes 
+domésticos sem identificação do comprador 
+poderá ser utilizado o valor “999999999”.
+----------------------------------------------------------
+customerCountry
+
+String 
+N 
+Código de país do comprador, seguindo a norma 
+ISO 3166-1-alpha-2, para compradores 
+domésticos é utilizada a sigla “AO”. 
+------------------------------------------------------------
+companyName 
+
+String 
+S 
+Nome/denominação do contribuinte.
+-------------------------------------------------------------
+lines 
+
+Array 
+N 
+Array com a lista de artigos do documento de 
+facturação 
+(object 
+document), 
+sendo 
+não 
+preenchido para os tipos de factura  
+(documentType):  
+
+AR - Aviso de Cobrança/Recibo  
+RC - Recibo Emitido  
+RG - Outros Recibos Emitidos  
+Este elemento é obrigatoriamente preenchido para 
+os demais tipos de documentos de facturação
+----------------------------------------------------------------------
+
+lineNumber
+
+String 
+S 
+Número da linha de artigos do documento de 
+facturação, começando em 1 e incrementando de 
+1 unidade em cada nova linha.
+----------------------------------------------------------------------- 
+
+productCode 
+String 
+S 
+Código do produto ou serviço.
+--------------------------------------------------------------------------
+
+productDescription 
+String 
+S 
+Descrição do produto ou serviço.
+---------------------------------------------------------------------------
+
+quantity 
+String 
+S 
+Quantidade, inteira ou decimal.
+---------------------------------------------------------------------------
+
+unitOfMeasure 
+String 
+N 
+Unidade de medida.
+----------------------------------------------------------------------------- 
+unitPrice 
+String 
+N 
+Preço unitário, sem descontos e sem impostos.
+-------------------------------------------------------------------------------
+  
+unitPriceBase 
+String 
+N 
+Preço unitário já deduzido de descontos por linha 
+ou cabeçalho, sem incluir impostos.
+---------------------------------------------------------------------------------
+
+referenceInfo 
+Objecto 
+N 
+Objecto detalhando a referência para o documento 
+base para este documento de facturação.  
+Obrigatório para documentos de facturação do 
+tipo:  
+
+NC, para indicar a factura base aonde se deu a 
+devolução de artigos; 
+-----------------------------------------------------------------------------------
+                                                    
+reference 
+String 
+S 
+Referência do documento de facturação origem a 
+que este artigo se refere. 
+----------------------------------------------------------------------------------
+
+referenceItemLineNo 
+String 
+N 
+Referência do numero do artigo do documento de 
+facturação origem a que este artigo se refere. 
+-----------------------------------------------------------------------------------
+reason 
+String 
+N 
+Motivo de intervenção no documento origem.
+-------------------------------------------------------------------------------------
+debitAmount 
+String 
+N 
+Montante total para cada linha, excluindo 
+impostos, sendo abatido o valor de descontos, 
+aonde o valor da taxa e/ou o motivo da isenção foi 
+aplicada.  
+Só um dos campos debitAmount e creditAmount 
+poderá estar preenchido.
+------------------------------------------------------------------------------------
+creditAmount 
+String 
+N 
+Montante total para cada linha, excluindo 
+impostos, sendo abatido o valor de descontos, 
+aonde o valor da taxa e/ou o motivo da isenção foi 
+aplicada.  
+Só um dos campos debitAmount e creditAmount 
+poderá estar preenchido.
+-----------------------------------------------------------------------------
+taxes 
+Array 
+N 
+Array de objectos que especificam o(s) imposto(s)  
+calculados para a linha.
+---------------------------------------------------------------------------
+taxType 
+String 
+N 
+Sistema de imposto, com os seguintes valores 
+possíveis e significados:  
+
+IVA - Imposto s/ o Valor Acrescentado;  
+IS - Imposto de Selo;  
+IEC - Imposto Especial de Consumo;  
+NS - Não sujeito a IVA, IS ou IEC. 
+---------------------------------------------------------------------------
+                                    
+taxCountryRegion 
+String 
+ 
+N 
+Código de País ou Região do Imposto. Quando se 
+refere a um país utiliza um código ISO 3166-1-
+alpha-2.  
+Quando se refere à região de Cabinda (único valor 
+possível diferente de códigos de países) deverá 
+utilizar o valor “AO-CAB”. 
+-----------------------------------------------------------------------------------------------------
+taxCode 
+String 
+N 
+Código de imposto, de preenchimento obrigatório 
+dependendo do valor preenchido no campo 
+taxType, assumindo os seguintes valores 
+possíveis e significados: Se taxType = IVA:  
+
+NOR - Taxa normal  
+INT – Taxa intermédia  
+RED – Taxa reduzida  
+ISE - Isento  
+OUT – Outra  
+Se taxType = IS:  
+• 
+Preenchido opcionalmente com a verba de IS, 
+ver valores possíveis no anexo 9.6.  
+ISE – Isento Se taxType = IEC:  
+Preenchido opcionalmente, quando 
+preenchido deverá ter o código pautal para 
+aplicação de IEC, ver valores possíveis no 
+anexo 9.7.  
+ISE – Isento  
+-----------------------------------------------------------------------------------------------------------
+taxBase 
+String 
+ 
+N 
+Valor tributável unitário, sendo gerado quando o 
+montante a constar na linha se refere unicamente 
+a imposto, i.e., a base tributável subjacente à 
+determinação desse imposto não constitui receita 
+do sujeito passivo (poderá não fazer parte dos 
+campos debitAmount ou creditAmount).  
+Exemplos:  
+• 
+Emitir um documento rectificativo de factura, 
+seja ele uma nota de débito ou crédito, por a 
+taxa de imposto mencionada na factura se 
+encontrar incorrecta e não existindo a 
+possibilidade ou intenção de proceder à 
+anulação desta ou de se efectuar o seu 
+estorno integral, ter-se-á de liquidar ou 
+devolver o imposto, respectivamente, em falta 
+ou em excesso.  
+Nas situações de concessão de crédito por 
+instituições mutuantes com o encargo de liquidar 
+Imposto do Selo pelo crédito concedido, a base 
+considerada para a liquidação desse imposto não 
+constitui sua receita pelo que essa base deverá 
+constar no campo TaxBase.
+-----------------------------------------------------------------------------------------------------------------
+
+taxPercentage 
+String 
+ 
+N 
+Taxa a aplicar em percentagem (exemplo: 14 
+representa a taxa de 14%). Deverá ser preenchida 
+com 0 no caso de isenção ou não sujeição.
+---------------------------------------------------------------------------------------------------------------------
+taxAmount 
+String 
+N 
+Valor fixo da verba de IS, concorre após 
+multiplicado pela quantidade (quantity) para o 
+valor de imposto total da linha do documento de 
+facturação.
+-------------------------------------------------------------------------------------------------------------------------
+taxContribution 
+String 
+N 
+Valor calculado de imposto para esta linha de 
+impostos (valor decimal com um máximo de 2 
+casas decimais)contribuindo para o total de 
+impostos do documento de facturação.  
+  
+O valor calculado neste campo deverá ser 
+arredondado por excesso para o cêntimo seguinte, 
+tal como ilustram os exemplos: 
+ 
+Cálculo    Valor do taxContribution 
+23,144     23,15 
+0,001844   0,01 
+5,9999999  6,00 
+-------------------------------------------------------------------------------------------------------------------
+taxExemptionCode  
+String 
+N 
+Código de motivo de isenção do imposto.  
+Campo deverá ser preenchido sempre  
+que campo taxCode assumir o valor  
+“ISE” (isento), sendo nesse caso de 
+preenchimento obrigatório.  
+Quando for preenchido  
+o taxType = “NS” (Não sujeito a IVA, 
+ IS ou IEC, deverá também ser  
+preenchido obrigatoriamente.  
+Quando preenchido assume um dos valores  
+constantes no anexo 9.1 (IVA), 9.2 (IS)  
+ou 9.3 (IEC).
+------------------------------------------------------------------------------------------------------------------------
+settlementAmount 
+String 
+N 
+Valor total de descontos, deve reflectir a proporção 
+do desconto global para essa linha e o desconto 
+específico para a mesma.
+-----------------------------------------------------------------------------------------------------------------------------
+paymentReceipt 
+Objecto 
+N 
+Object com os dados do recibo, sendo 
+obrigatoriamente preenchido para os tipos de 
+factura (documentType):  
+
+AR - Aviso de Cobrança/Recibo   
+RC - Recibo Emitido   
+RG - Outros Recibos Emitidos  
+Este elemento não é preenchido para os demais 
+tipos de documentos de facturação.
+--------------------------------------------------------------------------------------------------------------------------------------- 
+
+sourceDocuments 
+Array 
+S 
+Dados do documento de facturação pago.
+------------------------------------------------------------------------------------------------------------------------------------
+lineNo 
+String 
+ 
+S 
+Número da linha do documento de facturação que 
+foi incluída no recibo, iniciando em 1 e 
+incrementando de 1 unidade em cada nova linha.
+-------------------------------------------------------------------------------------------------------------------------------------
+
+sourceDocumentID 
+S 
+S 
+Dados do documento de facturação que foi 
+incluído neste recibo.
+---------------------------------------------------------------------------------------------------------------------------
+originatingON 
+String 
+S 
+Número do documento de facturação regularizado.
+--------------------------------------------------------------------------------------------------------------------------  
+
+documentDate 
+String 
+S 
+Data de emissão da factura ou documento 
+rectificativo desta a que se refere o pagamento. 
+Formato: “AAAA-MM-DD”.
+------------------------------------------------------------------------------------------------------------------------------
+debitAmount 
+String 
+S 
+Valor do recibo do documento rectificativo que  
+resultou da lista de documentos sem 
+impostos e eventuais descontos.  
+Um e um só dos campos debitAmount e 
+creditAmount poderá estar preenchido.  
+------------------------------------------------------------------------------------------------------------------------------
+
+creditAmount 
+String 
+S 
+Valor do recibo da factura ou documento 
+rectificativo, sem impostos e eventuais descontos.  
+Um e um só dos campos debitAmount e 
+creditAmount poderá estar preenchido.
+-------------------------------------------------------------------------------------------------------------------------------- 
+documentTotals 
+Objecto 
+S 
+Valor do recibo da factura ou documento 
+rectificativo, sem impostos e eventuais descontos.  
+Um e um só dos campos debitAmount e 
+creditAmount poderá estar preenchido.
+-----------------------------------------------------------------------------------------------------------------------------------
+taxPayable 
+String 
+S 
+Valor total de imposto devido (soma de imposto das 
+linhas).  
+Quando se trata de um documento de facturação 
+dos tipos:  
+
+AR - Aviso de Cobrança/Recibo;  
+RC - Recibo Emitido;  
+RG - Outros Recibos emitidos.  
+Este valor deverá ser apurado somando os 
+valores taxPayable dos diferentes documentos 
+origem regularizados pelo recibo, sendo as NC 
+contabilizadas com sinal negativo.  
+Este campo não poderá conter valores decimais 
+com mais do que 2 casas decimais.
+----------------------------------------------------------------------------------------------------------------------------------- 
+
+netTotal 
+String 
+S 
+Valor total do documento sem imposto  
+Quando se trata de um documento de facturação 
+dos tipos:  
+ 
+AR - Aviso de Cobrança/Recibo;  
+RC - Recibo Emitido;  
+RG - Outros Recibos emitidos.  
+Este valor é apurado somando os valores netTotal 
+dos diferentes documentos origem regularizados 
+pelo recibo, sendo as NC contabilizadas com sinal 
+negativo.
+-------------------------------------------------------------------------------------------------------------------------------------- 
+
+currency 
+String 
+S 
+Objecto destinado a guardar a informação da 
+divisa em que se processa o pagamento da 
+factura, não preenchido se divisa for AOA. Passa 
+a preenchimento obrigatório caso divisa diferente 
+de AOA.
+---------------------------------------------------------------------------------------------------------------------------------------
+
+grossTotal 
+String 
+S 
+Soma do valor total sem imposto e do valor total 
+de imposto devido.
+------------------------------------------------------------------------------------------------------------------------------------
+
+currency 
+Objecto 
+N 
+Objecto destinado a guardar a informação da 
+divisa em que se processa o pagamento da 
+factura, não preenchido se divisa for AOA. Passa 
+a preenchimento obrigatório caso divisa diferente de AOA.
+---------------------------------------------------------------------------------------------------------------------------------------
+                                                               
+currencyCode 
+String 
+N 
+Código da divisa utilizada para pagar a factura, 
+segundo norma ISO 4217 (excluindo AOA).
+---------------------------------------------------------------------------------------------------------------------------------------
+
+currencyAmount 
+String 
+N 
+Valor total na moeda estrangeira.
+-------------------------------------------------------------------------------------------------------------------------------------- 
+
+exchangeRate 
+String 
+N 
+Taxa de câmbio para AOA.
+--------------------------------------------------------------------------------------------------------------------------------------
+
+withholdingTaxList 
+String 
+Array 
+Indica se o imóvel está num processo de 
+solicitação.
+--------------------------------------------------------------------------------------------------------------------------------------
+withholdingTaxType 
+String 
+N 
+Código de tipo de retenção na fonte ou de cativação, assumindo os seguintes valores possíveis e significados:  
+ 
+IRT - Imposto Sobre os Rendimentos do 
+Trabalho;  
+II - Imposto Industrial;  
+IS - Imposto de Selo;  
+IVA - Imposto s/ o Valor Acrescentado;  
+IP - Imposto Predial;  
+IAC - Imposto sobre Aplicação de Capitais;  
+OU - Outros;  
+IRPC - Imposto s/ rendimento de pessoas 
+colectivas (impostos futuros);  
+IRPS - Imposto s/ rendimento de pessoas 
+singulares (impostos futuros).  
+---------------------------------------------------------------------------------------------------------------------------------------------
+                                               
+withholdingTaxDescription 
+String 
+N 
+O motivo de retenção na fonte. Devem ser 
+indicadas as disposições legais aplicáveis ou a 
+percentagem de imposto aplicável.
+----------------------------------------------------------------------------------------------------------------------------------------------- 
+
+withholdingTaxAmount 
+String 
+N 
+Valor de retenção na fonte.  
+Quando se trata de um documento de facturação 
+de um dos tipos:  
+
+AR - Aviso de cobrança/recibo  
+RC - Recibo emitido  
+RG - Outros recibos emitidos  
+Este valor é apurado agrupando os valores 
+withholdingTaxAmount, para o mesmo tipo de 
+imposto (withholdingTaxType) dos diferentes 
+documentos origem regularizados pelo recibo, 
+sendo as NC contabilizadas com sinal negativo. 
+---------------------------------------------------------------------------------------------------------------------------------------------------
+ 
+                                      4.1.7 Parâmetros de Saída
+----------------------------------------------------------------------------------------------------------------------------------------------------
+requestID 
+String 
+S 
+Registo de pedido efectuado com sucesso sendo 
+devolvido ID de confirmação de solicitação de 
+registo de documentos de facturação – a validação 
+será efectuada de forma diferida no tempo.  
+--------------------------------------------------------------------------------------------------------------------------------------------------
+errorList
+
+Array 
+N 
+Registo de pedido efectuado com erros, sendo 
+devolvida uma lista de erros na recepção dos 
+dados do pedido de registo dos documentos de 
+facturação.
+------------------------------------------------------------------------------------------------------------------------------------------------------ 
+idError
+String 
+S 
+Código do erro (ver tabela na secção 9.4).
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+descriptionError 
+String 
+S 
+Descrição do erro (ver tabela na secção 9.4).
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+documentNo 
+String 
+N 
+Número do documento de facturação a que se 
+refere o erro (campo com o mesmo nome 
+transmitido nos parâmetros de entrada). Campo 
+passa a obrigatório se erro ocorrer num dos 
+parâmetros incluídos no array documents. 
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+ 
+4.2 Obter Estado de Validação da Factura  
+ 
+4.2.1 Interface do Serviço 
+
+REST 
+
+Endpoint: https://sifphml.minfin.gov.ao/sigt/fe/v1/obterEstado 
+
+Request Exemplo (Accept: application/json): 
+ 
+{  
+    "schemaVersion": "string",  
+    "submissionUUID": "string",  
+    "taxRegistrationNumber": "string",  
+    "submissionTimeStamp": "string",  
+    "softwareInfo": {  
+         "softwareInfoDetail": { 
+                "productId": "string", 
+                "productVersion": "string", 
+                "softwareValidationNumber": "string" 
+           }, 
+           "jwsSoftwareSignature":"string" 
+      },  
+    "requestID": "string"  
+}  
+ 
+
+Response Exemplo (Accept: application/json): 
+ 
+{ 
+  "requestID": "string", 
+  "resultCode": "string", 
+  "taxRegistrationNumber": "string", 
+  "documentStatusList": [ 
+    { 
+      "documentNo": "string", 
+      "documentStatus": "string", 
+      "document": null, 
+      "errorList": [  
+           {  
+               "idError": "string",  
+                   "descriptionError": "string"  
+                } 
+       ] 
+   } 
+  ], 
+  "requestErrorList":  
+   [  
+           {  
+               "idError": "string",  
+                   "descriptionError": "string"  
+                } 
+    ] 
+} 
+ 
+4.2.2 Tipo de Comunicação 
+( X ) Síncrono  
+(    ) Assíncrono 
+(    ) One Way 
+ 
+4.2.3 Protocolo de Transporte 
+HTTPS 
+ 
+4.2.4 Formato da Mensagem 
+REST 
+ 
+4.2.5 Parâmetro de cabeçalho 
+ 
+Nome 
+Tipo 
+Obrigatório 
+Descrição 
+Username 
+String 
+S 
+Identificador do Usuário que invocou o serviço. 
+Password 
+String 
+S 
+Token de acesso ao serviço. 
+ 
+-------------------------------------------------------------------------------------------------------
+ 
+4.2.6 Parâmetros de Entrada 
+
+Nome    Tipo    Obrigatório    Descrição 
+
+schemaVersion 
+String 
+S 
+Versão do schema do serviço, exemplo “1.0” 
+--------------------------------------------------------------------------------------------------------
+taxRegistrationNumber 
+String 
+S 
+Número fiscal de contribuinte do emissor da factura. 
+submissionUUID 
+String 
+N 
+Identificador (GUID ou UUID) da solicitação fornecido 
+pelo software. 
+N indica o variant (especifica o layout; para UUIDs 
+compatíveis com RFC 4122, os primeiros bits de N 
+devem estar entre 8 e b).  
+Exemplo:  
+550e8400-e29b-41d4-a716-446655440000  
+  
+Este identificador deverá ser único por cada requisição 
+do contribuinte emissor.
+-------------------------------------------------------------------------------------------------------
+ 
+submissionTimeStamp 
+String 
+S 
+Timestamp de submissão do pedido no formato ISO 
+8601, exemplos:  
+• 
+"2025-05-27T14:30:00Z" (em UTC)  
+"2025-05-27T14:30:00-03:00" (com informação de 
+timezone) 
+------------------------------------------------------------------------------------------------------
+softwareInfo 
+Objecto 
+S 
+Objecto com os dados do Software de Facturação 
+          softwareInfoDetail 
+Objecto 
+S 
+Objecto com os detalhes do Software de Facturação  
+                                    productId 
+String 
+S 
+Nome do Software de Facturação.  
+                                    productVersion 
+String 
+S 
+Versão do Software de Facturação.
+---------------------------------------------------------------------------------------------------
+
+softwareValidationNumber 
+String 
+S 
+Número de Certificação do Software de Facturação.
+--------------------------------------------------------------------------------------------
+
+jwsSoftwareSignature 
+String 
+S 
+Assinatura digital do Software de Facturação usando a 
+chave privada do software, através o algoritmo RS256  
+(RSA + SHA-256).   
+Todos os campos do objecto softwareInfo devem ser 
+usados na assinatura.
+----------------------------------------------------------------------------------------------------   
+jwsSignature 
+String 
+S 
+Assinatura digital da solicitação usando a chave privada 
+do emissor através do algoritmo RS256 (RSA + SHA-
+256). Os campos a serem utilizados na assinatura são:    
+taxRegistrationNumber  
+requestID   
+------------------------------------------------------------------------------------------------
+
+requestID 
+String 
+S 
+Identificador do pedido de registo de documentos de 
+facturação, valor obtido quando ocorreu com sucesso a 
+chamada ao serviço registarFactura.
+------------------------------------------------------------------------------------------------- 
+ 
+                               4.2.7 Parâmetros de Saída 
+
+Nome    Tipo    Obrigatório    Descrição 
+----------------------------------------------------------------------------------------------
+requestID 
+String 
+S 
+Identificador do pedido de registo de 
+documentos de facturação que se pretende 
+consultar (enviado como parâmetro na 
+chamada).
+----------------------------------------------------------------------------------------------
+
+taxRegistrationNumber 
+String 
+S 
+Número fiscal de contribuinte do emissor da 
+factura.
+-----------------------------------------------------------------------------------------------
+resultCode 
+String 
+ 
+N 
+Resultado do processamento da solicitação de 
+registo de facturas, com os seguintes valores 
+possíveis e significados:  
+
+0 - Processamento concluído, sem facturas inválidas;  
+
+1 - Processamento concluído, com facturas válidas e facturas inválidas;  
+
+2 - Processamento concluído, sem facturas válidas;  
+
+7 - Solicitação não respondida por ser prematura ou repetitiva, devendo aguardar período mínimo para repetir este pedido;
+
+8 - Processamento ainda em curso;
+
+9 - Processamento cancelado. 
+-----------------------------------------------------------------------------------
+
+documentStatusList 
+Array 
+N 
+Lista de erros na requisição
+-----------------------------------------------------------------------------------
+documentNo 
+String 
+S 
+Identificação única do documento.
+----------------------------------------------------------------------------------- 
+
+documentStatus 
+String 
+S 
+Resultado do processamento da 
+factura identificada no campo 
+documentNo, com os seguintes 
+valores possíveis e significados: 
+ 
+V - Factura válida;  
+
+I - Factura inválida.
+-----------------------------------------------------------------------------------
+
+errorList 
+Array 
+N 
+Array com os erros encontrados no 
+processamento do documento de facturação 
+identificado no campo documentNo, sendo 
+obrigatório quando documentStatus for “I”.  
+Terá uma linha para cada erro encontrado.
+-----------------------------------------------------------------------------------------  
+
+idError 
+ 
+S 
+Código de erro
+------------------------------------------------------------------------------------------
+ 
+
+descriptionError  
+S 
+Descrição do erro
+----------------------------------------------------------------------------------------- 
+
+requestErrorList 
+Array 
+N 
+Nome do contribuinte
+----------------------------------------------------------------------------------------
+
+idError 
+String 
+S 
+Código de erro
+----------------------------------------------------------------------------------------
+  
+descriptionError 
+String 
+S 
+Descrição do erro
+----------------------------------------------------------------------------------------
+  
+
+ 
+4.3 Listar Facturas  
+ 
+4.3.8 Interface do Serviço 
+
+REST 
+
+Endpoint: https://sifphml.minfin.gov.ao/sigt/fe/v1/listarFacturas 
+o 
+Request Exemplo (Accept: application/json): 
+ 
+ 
+{  
+  "schemaVersion": "string", 
+  "submissionGUID": "string", 
+  "submissionTimeStamp": "string", 
+  "softwareInfo": { 
+    "softwareInfoDetail": { 
+      "productId": "string", 
+      "productVersion": "string", 
+      "softwareValidationNumber": "string" 
+    }, 
+    "jwsSoftwareSignature": "string" 
+  }, 
+  "jwsSignature": "string", 
+  "taxRegistrationNumber": "string", 
+  "queryStartDate": "string", 
+  "queryEndDate": "string" 
+}  
+ 
+Response Exemplo (Accept: application/json): 
+ 
+ 
+{ 
+  "statusResult": { 
+    "documentResultCount": "string", 
+    "resultEntryList": [ 
+      { 
+        "documentEntryResult": { 
+          "id": "string", 
+          "documentType": "string", 
+          "documentNo": "string", 
+          "documentDate": "string", 
+          "documentStatus": "string", 
+          "documentStatusDescription": "string", 
+          "netTotal": "string" 
+        } 
+      } 
+    ] 
+  } 
+}  
+ 
+ 
+4.3.9 Tipo de Comunicação 
+( X ) Síncrono  
+(    ) Assíncrono 
+(    ) One Way 
+ 
+4.3.10 
+Protocolo de Transporte 
+HTTPS 
+ 
+4.3.11 
+Formato da Mensagem 
+REST 
+ 
+ 
+4.3.12 
+Parâmetro de cabeçalho 
+ 
+Nome 
+Tipo 
+Obrigatório 
+Descrição 
+Username 
+String 
+S 
+Identificador do Usuário que invocou o serviço. 
+Password 
+String 
+S 
+Token de acesso ao serviço. 
+ ---------------------------------------------------------------------------------------------------------
+
+4.3.13  Parâmetros de Entrada
+
+Nome        Tipo        Obrigatório        Descrição
+
+schemaVersion
+
+String 
+S 
+Versão do schema do serviço, exemplo “1.0”
+----------------------------------------------------------------------------------------------------------
+
+taxRegistrationNumber 
+String 
+S 
+Número fiscal de contribuinte.
+-------------------------------------------------------------------------------------------------------
+
+submissionGUID 
+String 
+N 
+Identificador (GUID ou UUID) da solicitação fornecido 
+pelo software. 
+N indica o variant (especifica o layout; para UUIDs 
+compatíveis com RFC 4122, os primeiros bits de N 
+devem estar entre 8 e b).  
+Exemplo:  
+550e8400-e29b-41d4-a716-446655440000  
+  
+Este identificador deverá ser único por contribuinte 
+emissor.
+----------------------------------------------------------------------------------------------------
+ 
+submissionTimeStamp 
+String 
+S 
+Timestamp de submissão do pedido no formato ISO 
+8601, exemplos:  
+• 
+"2025-05-27T14:30:00Z" (em UTC)  
+"2025-05-27T14:30:00-03:00" (com informação de 
+timezone)
+-------------------------------------------------------------------------------------------------
+softwareInfo 
+Objecto 
+S 
+Objecto com os dados do Software de Facturação
+----------------------------------------------------------------------------------------------------
+softwareInfoDetail 
+Objecto 
+S 
+Objecto com os detalhes do Software de Facturação
+-------------------------------------------------------------------------------------------------
+productId 
+String 
+S 
+Nome do Software de Facturação.
+---------------------------------------------------------------------------------------------------  
+productVersion 
+String 
+S 
+Versão do Software de Facturação.
+-------------------------------------------------------------------------------------------------- 
+softwareValidationNumber 
+String 
+S 
+Número de Certificação do Software de Facturação.
+-------------------------------------------------------------------------------------------------- 
+jwsSoftwareSignature 
+String 
+S 
+Assinatura digital do Software de Facturação usando a 
+chave privada do software, através o algoritmo RS256  
+(RSA  +  SHA-256).   
+Todos os campos do objecto softwareInfo devem ser usados na assinatura.
+--------------------------------------------------------------------------------------------  
+jwsSignature 
+String 
+S 
+Assinatura digital da solicitação usando a chave privada 
+do emissor através do algoritmo RS256 (RSA + SHA-
+256).
+  
+Os campos a serem utilizados na assinatura são:    
+•  taxRegistrationNumber;   
+•  queryStartDate;  
+•  queryEndDate.
+--------------------------------------------------------------------------------------------
+
+queryStartDate 
+String 
+S 
+Data inicio do período de pesquisa de facturas recebidas 
+a pesquisar. Formato: “AAAA-MM-DD”
+--------------------------------------------------------------------------------------------
+
+queryEndDate 
+String 
+S 
+Data final do período de pesquisa de facturas recebidas 
+a pesquisar. “AAAA-MM-DD” 
+-------------------------------------------------------------------------------------------
+
+4.3.14 - Parâmetros de Saída 
+Nome    Tipo    Obrigatório    Descrição
+------------------------------------------------------------------------------------------
+
+statusResult 
+String 
+S 
+Objecto com os dados da factura statusResult
+-----------------------------------------------------------------------------------------  
+
+documentResultCount 
+Integer 
+S 
+Quantidade de registos retornados no array resultEntryList
+-------------------------------------------------------------------------------------
+
+resultEntryList 
+Array 
+N 
+Objecto com os dados da factura resultEntryList
+-----------------------------------------------------------------------------
+
+documentEntryResult 
+Objecto 
+N 
+Objecto com os dados da factura documentEntryResult
+-----------------------------------------------------------------------------
+ 
+id 
+Boolean 
+N 
+Identificador do documento
+------------------------------------------------------------------------------
+
+documentType 
+String 
+N 
+Tipo do documento
+----------------------------------------------------------------------------
+
+documentNo 
+String 
+S 
+Numero do documento
+--------------------------------------------------------------------------
+ 
+documentDate 
+String 
+S 
+Data de emissão do documento
+----------------------------------------------------------------------------
+
+documentStatus 
+String 
+N 
+Estado do documento
+----------------------------------------------------------------------------
+
+documentStatusDescription 
+String 
+N 
+Descrição do estado do documento
+----------------------------------------------------------------------------
+ 
+netTotal 
+String 
+N 
+Total liquido do documento
+----------------------------------------------------------------------------
+  
+ 
+ 
+4.4 Consultar Facturas 
+ 
+4.4.15 Interface do Serviço 
+
+REST 
+
+Endpoint: https://sifphml.minfin.gov.ao/sigt/fe/v1/consultarFactura  
+ 
+Request Exemplo (Accept: application/json):  
+ 
+{  
+  "schemaVersion": "string",  
+  "submissionUUID": "string",  
+"taxRegistrationNumber": "string",  
+"submissionTimeStamp": "string",  
+"invoiceNo": "string",  
+  "softwareInfo": {  
+       "softwareInfoDetail": {  
+           "productId": "string",  
+           "productVersion": "string",  
+           "softwareValidationNumber": "string" 
+       },  
+  "jwsSoftwareSignature":"string"  
+  },  
+  "jwsSignature": "string"  
+}  
+ ------------------------------------------------------------------------------------
+Response Exemplo (Accept: application/json): 
+ 
+{  
+  "documentNo": "string",  
+  "documentStatus": "string",  
+  "document": {  
+        "documentNo": "string",  
+        "documentStatus": "string",  
+        "documentType": "string",  
+        "documentDate": "string",  
+        "systemEntryDate": "string",  
+        "reportUrl": "string",  
+        "costumerName": "string",  
+        "customerTaxID": "string",  
+        "customerCountry": "string",  
+        "companyName": "string",  
+        "emitterTaxId": "string",  
+        "currencyCode": "string",  
+        "currencyAmount": "string",  
+        "exchangeRate": "string",  
+        "softwareValidationNo": "string",      
+        "jwsSignature": "string",  
+        "documentTotals": {  
+              "taxPayable": "string",  
+              "netTotal": "string",  
+              "grossTotal": "string", 
+              "currency": {  
+                  "currencyCode": "string",  
+                  "currencyAmount": "string",  
+                  "exchangeRate": "string", 
+                },  
+        }, 
+        "taxRegistrationNumber": "string", 
+        "lines": [  
+         {  
+            "lineNumber": "string",  
+            "productCode":"string",  
+            "productDescription": "string",  
+            "quantity": "string",  
+            "unitOfMeasure": "string",  
+            "unitPrice": "string",  
+            "unitPriceBase": "string",  
+            "debitAmount": "string",  
+            "creditAmount": "string",  
+            "settlementAmount": "string",  
+            "taxes": [  
+ 
+         {  
+            "taxType": "string",  
+            "taxCountryRegion": "string",  
+            "taxCode": "string" 
+            "taxBase": "string" 
+            "taxPercentage": "string" 
+            "taxAmmount": "string" 
+            "taxContribution": "string" 
+            "taxExemptionCode": "string" 
+          }  
+      ] 
+         }  
+         ],  
+        "withholdingTaxList": [  
+         {  
+            "withholdingTaxType": "string",  
+            "withholdingTaxDescription": "string",  
+            "withholdingTaxAmount": "string" 
+          }  
+        ], 
+        "paymentReceipt": [  
+                { 
+                        "lineNo": "string" 
+                        "debitAmount": "string" 
+                        "creditAmount": "string" 
+                 } 
+        ]  
+ }, 
+  "documentStatusList": [ 
+    { 
+      "documentNo": "string", 
+      "documentStatus": "string", 
+      "document": null, 
+      "errorList": [  
+           {  
+               "idError": "string",  
+                   "descriptionError": "string"  
+                } 
+       ] 
+   } 
+  ], 
+ "errorList": [ 
+{ 
+  "idError": "string",  
+  "descriptionError": "string"  
+}] 
+     }  
+  
+4.4.16 Tipo de Comunicação 
+( X ) Síncrono  
+(    ) Assíncrono 
+(    ) One Way 
+ 
+4.4.17 
+Protocolo de Transporte 
+HTTPS 
+ 
+4.4.18 Formato da Mensagem 
+REST 
+ 
+4.4.19 Parâmetro de cabeçalho 
+ 
+Nome 
+Tipo 
+Obrigatório 
+Descrição 
+Username 
+String 
+S 
+Identificador do Usuário que invocou o serviço. 
+Password 
+String 
+S 
+Token de acesso ao serviço. 
+ ------------------------------------------------------------------------------------------------------
+4.4.20 Parâmetros de Entrada 
+
+Nome        Tipo        Obrigatório        Descrição 
+--------------------------------------------------------------------------------------------------------
+
+schemaVersion 
+String 
+S 
+Versão do schema do serviço, exemplo “1.0” 
+----------------------------------------------------------------------------------------
+taxRegistrationNumber 
+String 
+S 
+Número fiscal de contribuinte. 
+---------------------------------------------------------------------------------------
+submissionUUID 
+String 
+N 
+Identificador (GUID ou UUID) da solicitação fornecido 
+pelo software. 
+N indica o variant (especifica o layout; para UUIDs 
+compatíveis com RFC 4122, os primeiros bits de N 
+devem estar entre 8 e b).  
+Exemplo:  
+550e8400-e29b-41d4-a716-446655440000  
+  
+Este identificador deverá ser único por contribuinte 
+emissor.
+----------------------------------------------------------------------------------------
+submissionTimeStamp 
+String 
+S 
+Timestamp de submissão do pedido no formato ISO 
+8601, exemplos:  
+• 
+"2025-05-27T14:30:00Z" (em UTC)  
+"2025-05-27T14:30:00-03:00" (com informação de timezone)
+--------------------------------------------------------------------------------------
+
+invoiceNo 
+String 
+S 
+Identificador da factura electrónica que se pretende 
+consultar.
+--------------------------------------------------------------------------------------
+
+softwareInfo 
+Objecto 
+S 
+Objecto com os dados do Software de Facturação
+-----------------------------------------------------------------------------------
+
+softwareInfoDetail 
+Objecto 
+S 
+Objecto com os detalhes do Software de Facturação
+---------------------------------------------------------------------------------  
+
+productId 
+String 
+S 
+Nome do Software de Facturação. 
+------------------------------------------------------------------------------ 
+
+productVersion 
+String 
+S 
+Versão do Software de Facturação.
+-----------------------------------------------------------------------------  
+
+softwareValidationNumber 
+String 
+S 
+Número de Certificação do Software de Facturação.
+-------------------------------------------------------------------------  
+          
+jwsSoftwareSignature 
+String 
+S 
+Assinatura digital do Software de Facturação usando a 
+chave privada do software, através o algoritmo RS256  
+(RSA + SHA-256).   
+Todos os campos do objecto softwareInfo devem ser usados na assinatura. 
+--------------------------------------------------------------------------- 
+
+jwsSignature 
+String 
+S 
+Assinatura digital da solicitação usando a chave privada 
+do emissor através do algoritmo RS256 (RSA + SHA-
+256). Os campos a serem utilizados na assinatura são:     
+*taxRegistrationNumber  
+*requestID   
+ --------------------------------------------------------------------------
+
+4.4.21 - Parâmetros de Saída 
+
+Nome        Tipo        Obrigatório        Descrição
+---------------------------------------------------------------------------
+
+documentNo 
+String 
+S 
+Identificação única do documento, gerado pelo Software de Facturação de documentos em 
+conformidade com o documento SAF-T(AO).  Consiste de um código de documento interno - 
+espaço - número de série do documento -/- e 
+um número sequencial do documento para a sequência de consentimento.
+--------------------------------------------------------------------------------------
+
+documentStatus 
+String 
+S 
+Array de linhas de NIFs 
+-------------------------------------------------------------------------------------
+
+document 
+Objecto 
+N 
+Item da lista de NIFs
+-------------------------------------------------------------------------------
+
+documentNo 
+String 
+S 
+Numero NIF
+-----------------------------------------------------------------------------
+
+documentStatus 
+string 
+S 
+Nome do contribuinte
+-----------------------------------------------------------------------------
+documentType 
+String 
+S 
+Estado do contribuinte
+--------------------------------------------------------------------------- 
+documentDate 
+String 
+S 
+Data de emissão do documento.
+-------------------------------------------------------------------------
+
+systemEntryDate 
+String 
+S 
+Operação efectuada
+---------------------------------------------------------------------------
+
+reportUrl 
+String
+N 
+----------------------------------------------------------------------------
+costumerName 
+String 
+N 
+--------------------------------------------------------------------------
+ customerTaxID 
+String 
+S 
+Número  de identificação do cliente da factura. 
+Para compradores domésticos (identificados 
+com AO no campo customerCountry) é 
+preenchido com o NIF em Angola.  
+Para documentos de facturação de 
+contribuintes domésticos sem identificação do 
+comprador poderá ser utilizado o valor 
+“999999999”.
+-------------------------------------------------------------------------
+
+customerCountry 
+String 
+S 
+Código de país do comprador, seguindo a 
+norma ISO 3166-1-alpha-2, para compradores 
+domésticos é utilizada a sigla “AO”.
+-----------------------------------------------------------------------
+
+companyName 
+String 
+S 
+Nome/denominação do contribuinte.
+----------------------------------------------------------------------- 
+
+softwareValidationNo 
+String 
+S 
+Número de certificação do Software de Facturação.
+-----------------------------------------------------------------------
+
+jwsSignature 
+String 
+N 
+Assinatura da factura, encriptação usando a 
+chave privada do emissor com os seguintes 
+campos da factura:
+
+*documentNo  
+*taxRegistrationNumber  
+*documentType  
+*documentDate  
+*customerTaxID  
+*customerCountry  
+*companyName  
+*documentTotals
+-------------------------------------------------------- 
+       
+documentTotals 
+Objecto 
+S 
+Valor do recibo da factura ou documento 
+rectificativo, sem impostos e eventuais 
+descontos.  
+Um e um só dos campos debitAmount e 
+creditAmount poderá estar preenchido.
+---------------------------------------------------------------
+                
+taxPayable 
+String 
+S 
+Valor total de imposto devido (soma de 
+imposto das linhas).  
+Quando se trata de um documento de 
+facturação dos tipos:  
+• 
+AR - Aviso de Cobrança/Recibo;  
+• 
+RC - Recibo Emitido;  
+• 
+RG - Outros Recibos emitidos.  
+Este valor deverá é apurado somando os 
+valores taxPayable dos diferentes 
+documentos origem regularizados pelo recibo, sendo as NC contabilizadas com sinal 
+negativo.  
+---------------------------------------------------------------------------------------------
+                
+netTotal 
+String 
+S 
+Valor total do documento sem imposto  
+Quando se trata de um documento de 
+facturação dos tipos:  
+• 
+AR - Aviso de Cobrança/Recibo;  
+• 
+RC - Recibo Emitido;  
+• 
+RG - Outros Recibos emitidos.  
+Este valor é apurado somando os valores 
+netTotal dos diferentes documentos origem 
+regularizados pelo recibo, sendo as NC 
+contabilizadas com sinal negativo.
+-----------------------------------------------------------------------------------------
+                
+grossTotal 
+String 
+S 
+Soma do valor total sem imposto e do valor 
+total de imposto devido.
+--------------------------------------------------------------------------------------
+               
+currency 
+Objecto 
+N 
+Objecto com a informação da divisa em que se 
+processa o pagamento da factura, não 
+preenchido se divisa for AOA.
+------------------------------------------------------------------------------------------   
+                        
+currencyCode 
+String 
+S 
+Código da divisa utilizada para pagar a 
+factura, segundo norma ISO 4217 (excluindo 
+AOA).
+------------------------------------------------------------------------------------------
+                        
+currencyAmount 
+String 
+S 
+Valor total na moeda estrangeira.
+----------------------------------------------------------------------------------------
+                        
+exchangeRate 
+String 
+S 
+Taxa de câmbio para AOA.
+-----------------------------------------------------------------------------------------
+          
+taxRegistrationNumber 
+String 
+N
+------------------------------------------------------------------------------------------
+ 
+          
+lines 
+Array 
+N 
+Array com a lista de artigos do documento de 
+facturação (object document), sendo que não 
+é preenchido para os tipos de factura  
+(documentType):  
+• 
+AR - Aviso de Cobrança/Recibo  
+• 
+RC - Recibo Emitido  
+• 
+RG - Outros Recibos Emitidos  
+Este elemento é obrigatoriamente preenchido 
+para os demais tipos de documentos de 
+facturação
+---------------------------------------------------------------------------------------
+                    
+lineNumber 
+String 
+S 
+Número da linha de artigos do documento de 
+facturação, começando em 1 e incrementando 
+de 1 unidade em cada nova linha.
+--------------------------------------------------------------------------------------
+
+                    
+productCode 
+String 
+S 
+Código do produto ou serviço.
+--------------------------------------------------------------------------------------
+                    
+productDescription 
+String 
+S 
+Descrição do produto ou serviço.
+-------------------------------------------------------------------------------------
+                    
+quantity 
+String 
+S 
+Quantidade, inteira ou decimal.
+---------------------------------------------------------------------------------- 
+                    
+unitOfMeasure 
+String 
+N 
+Unidade de medida.
+---------------------------------------------------------------------------------
+                    
+unitPrice 
+String 
+N 
+Preço unitário, sem descontos e sem impostos.
+-------------------------------------------------------------------------------
+                  
+unitPriceBase 
+String 
+N 
+Preço unitário já deduzido de descontos por 
+linha ou cabeçalho, sem incluir impostos.
+-----------------------------------------------------------------------------
+                    
+debitAmount 
+String 
+N 
+Montante total para cada linha, excluindo 
+impostos, sendo abatido o valor de descontos, 
+aonde o valor da taxa e/ou o motivo da 
+isenção foi aplicada.  Só um dos campos debitAmount e 
+creditAmount poderá estar preenchido. 
+---------------------------------------------------------------------------
+                    
+creditAmount 
+String 
+N 
+Montante total para cada linha, excluindo 
+impostos, sendo abatido o valor de descontos, 
+aonde o valor da taxa e/ou o motivo da 
+isenção foi aplicada.  Só um dos campos debitAmount e creditAmount poderá estar preenchido.
+-------------------------------------------------------------------------------------------------
+                    
+settlementAmount 
+String 
+N 
+Valor total de descontos, deve reflectir a 
+proporção do desconto global para essa linha 
+e o desconto específico para a mesma.
+-------------------------------------------------------------------------------------------------------
+                    
+taxes 
+Array 
+N 
+Array de objectos que especificam o(s) 
+imposto(s)  calculados para a linha.
+--------------------------------------------------------------------------------------------------------
+                              
+taxType 
+String 
+S 
+Sistema de imposto, com os seguintes valores 
+possíveis e significados:  
+• 
+IVA - Imposto s/ o valor 
+acrescentado; 
+• 
+IS - Imposto de Selo;  
+• 
+IEC - Imposto Especial de 
+Consumo;  
+• 
+NS - Não sujeito a IVA, IS ou IEC.
+------------------------------------------------------------------------------------------------------------- 
+                      
+taxCountryRegion 
+String 
+ 
+S 
+Código de País ou Região do Imposto. 
+Quando se refere a um país utiliza um código 
+ISO 3166-1-alpha-2.  
+Quando se refere à região de Cabinda (único 
+valor possível diferente de códigos de países) 
+deverá utilizar o valor “AO-CAB”. 
+------------------------------------------------------------------------------------------------------------
+                              
+taxCode 
+String 
+N 
+Código de imposto, de preenchimento 
+obrigatório dependendo do valor preenchido 
+no campo taxType, assumindo os seguintes 
+valores possíveis e significados:  
+Se taxType = IVA:  
+• 
+NOR - Taxa normal  
+• 
+INT – Taxa intermédia  
+• 
+RED – Taxa reduzida  
+• 
+ISE - Isento  
+• 
+OUT – Outra  
+Se taxType = IS:  
+• 
+Preenchido opcionalmente com a 
+verba de IS, ver valores possíveis no 
+anexo 9.6.  
+• 
+ISE – Isento Se taxType = IEC:  
+• 
+Preenchido opcionalmente, quando 
+preenchido deverá ter o código pautal 
+para aplicação de IEC, ver valores 
+possíveis no anexo 9.7.  
+ISE – Isento
+------------------------------------------------------------------------------------------------------------------------                       
+taxBase 
+String 
+ 
+N 
+Valor tributável unitário, sendo gerado quando 
+o montante a constar na linha se refere 
+unicamente a imposto, i.e., a base tributável 
+subjacente à determinação desse imposto não 
+constitui receita do sujeito passivo (poderá não 
+fazer parte dos campos debitAmount ou 
+creditAmount).  
+Exemplos: Emitir um documento rectificativo de 
+factura, seja ele uma nota de débito ou 
+crédito, por a taxa de imposto mencionada 
+na factura se encontrar incorrecta e não 
+existindo a possibilidade ou intenção de 
+proceder à anulação desta ou de se 
+efectuar o seu estorno integral, ter-se-á de 
+liquidar ou devolver o imposto, respectivamente, em falta ou em excesso.  Nas situações de concessão de crédito por 
+instituições mutuantes com o encargo de liquidar Imposto do Selo pelo crédito concedido, a base considerada para a 
+liquidação desse imposto não constitui sua receita pelo que essa base deverá constar no campo TaxBase.
+--------------------------------------------------------------------------------------------------------------------------------  
+                              
+taxPercentage 
+String 
+ 
+N 
+Taxa a aplicar em percentagem (exemplo: 14 
+representa a taxa de 14%). Deverá ser 
+preenchida com 0 no caso de isenção ou não 
+sujeição. 
+----------------------------------------------------------------------------------------------------------------------------------------
+
+taxAmount 
+String 
+N 
+Valor fixo da verba de IS, concorre após 
+multiplicado pela quantidade (quantity) para o 
+valor de imposto total da linha do documento 
+de facturação. 
+----------------------------------------------------------------------------------------------------------------------------------------                              
+
+taxContribution 
+String 
+N 
+Valor calculado de imposto para esta linha de 
+impostos (valor decimal com um máximo de 2 
+casas decimais) contribuindo para o total de 
+impostos do documento de facturação.  
+-----------------------------------------------------------------------------------------------------------------------------------------                              
+
+taxExemptionCode  
+String 
+N 
+Código de motivo de isenção do imposto.  
+Preenchido quando taxCode  assumir o valor  
+“ISE” (isento), sendo nesse caso de 
+preenchimento obrigatório.  
+Quando for preenchido o taxType = “NS” (Não 
+sujeito a IVA, IS ou IEC), deverá também ser  
+preenchido obrigatoriamente. Quando preenchido assume um dos valores  
+constantes no anexo 9.1 (IVA), 9.2 (IS) ou 9.3 (IEC).
+-----------------------------------------------------------------------------------------------------------------------------------------------
+          
+withholdingTaxes 
+Objecto 
+N 
+Array com a lista de retenções na fonte do 
+documento de facturação (object 
+withHoldingTax).
+--------------------------------------------------------------------------------------------------------------------------------------------
+                    
+withholdingTaxType 
+String 
+N 
+Código de tipo de retenção na fonte ou de 
+cativação, assumindo os seguintes valores 
+possíveis e significados:  
+• 
+IRT - Imposto Sobre os 
+Rendimentos do Trabalho;  
+• 
+II - Imposto Industrial;  
+• 
+IS - Imposto de Selo;  
+• 
+IVA - Imposto s/ o Valor 
+Acrescentado;  
+• 
+IP - Imposto Predial;  
+• 
+IAC - Imposto sobre Aplicação de 
+Capitais;  
+• 
+OU - Outros;  
+• 
+IRPC - Imposto s/ rendimento de 
+pessoas colectivas (impostos futuros);  
+IRPS - Imposto s/ rendimento de pessoas 
+singulares (impostos futuros).
+---------------------------------------------------------------------------------------------------------------------------------------------------- 
+                    
+withholdingTaxDescription 
+String 
+N 
+O motivo de retenção na fonte. Devem ser 
+indicadas as disposições legais aplicáveis ou a 
+percentagem de imposto aplicável.
+---------------------------------------------------------------------------------------------------------------------------------------------------- 
+                    
+withholdingTaxAmount 
+String 
+N 
+Valor de retenção na fonte.  
+Quando se trata de um documento de 
+facturação de um dos tipos:  
+• 
+AR - Aviso de cobrança/recibo  
+• 
+RC - Recibo emitido  
+• 
+RG - Outros recibos emitidos  
+Este valor é apurado agrupando os valores 
+withholdingTaxAmount, para o mesmo tipo de 
+imposto (withholdingTaxType) dos diferentes 
+documentos origem regularizados pelo recibo, 
+sendo as NC contabilizadas com sinal 
+negativo.
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+            
+paymentReceipt 
+Objecto 
+S 
+Object com os dados do recibo, sendo 
+obrigatoriamente preenchido para os tipos de 
+factura (documentType):  
+AR - Aviso de Cobrança/Recibo  
+RC - Recibo Emitido  
+RG - Outros Recibos Emitidos  
+Este elemento não é preenchido para os 
+demais tipos de documentos de facturação.
+----------------------------------------------------------------------------------------------------------------------------------------------------------------- 
+                                                
+lineNo 
+String 
+S 
+Número da linha do documento de facturação 
+que foi incluida no recibo, iniciando em 1 e 
+incrementando de 1 unidade em cada nova linha.
+------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                        
+sourceDocuments 
+Array 
+S 
+Dados do documento de facturação pago.
+------------------------------------------------------------------------------------------------------------------------------------------------------------------ 
+                                                 
+sourceDocumentID 
+S 
+S 
+Dados do documento de facturação que foi incluído neste recibo.
+---------------------------------------------------------------------------------------------------------------------------------------------------------------- 
+                                                                   
+originatingON 
+String 
+S 
+Número do documento de facturação regularizado.
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+                                                                   
+documentDate 
+String 
+S 
+Data de emissão da factura ou documento rectificativo desta a que se refere o pagamento. Formato: “AAAA-MM-DD”.
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+                                                 
+debitAmount 
+String 
+S 
+Valor do recibo do documento rectificativo que  
+resultou da lista de documentos sem impostos 
+e eventuais descontos.  Um e um só dos campos debitAmount e creditAmount poderá estar preenchido.
+------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+                                                     
+creditAmount 
+String 
+S 
+Valor do recibo da factura ou documento 
+rectificativo, sem impostos e eventuais descontos.  Um e um só dos campos debitAmount e creditAmount poderá estar preenchido.
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------- 
+            
+errorList 
+Array 
+N 
+Lista com as descrições de erros encontrados na requisição.
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                        
+idError 
+String 
+S 
+Código do erro (ver tabela na secção 9.4).
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+                        
+descriptionError 
+String 
+S 
+Descrição do erro (ver tabela na secção 9.4).
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  
+ 
+4.5 Solicitar Série  
+ 
+4.5.22 Interface do Serviço 
+
+REST 
+
+Endpoint: https://sifphml.minfin.gov.ao/sigt/fe/v1/solicitarSerie 
+
+Request Exemplo (Accept: application/json): 
+ 
+{  
+{ 
+    "schemaVersion": "string", 
+    "submissionUUID": " string", 
+    "taxRegistrationNumber": "string", 
+    "submissionTimeStamp": "string", 
+    "softwareInfo": { 
+        "softwareInfoDetail": { 
+            "productId": "string", 
+            "productVersion": "string", 
+            "softwareValidationNumber": "string" 
+        }, 
+        "jwsSoftwareSignature": "string" 
+    }, 
+    "seriesYear": "string", 
+    "documentType": "string", 
+    "establishmentNumber": "string",  
+    "jwsSignature": "string", 
+    "seriesContingencyIndicator": "string" 
+} 
+ 
+ 
+Response Exemplo (Accept: application/json): 
+ 
+{ 
+  "requestID": "string", 
+  "resultCode": "string", 
+  "taxRegistrationNumber": "string", 
+  "documentStatusList": [ 
+    { 
+      "documentNo": "string", 
+      "documentStatus": "string", 
+      "document": null, 
+      "errorList": [  
+           {  
+               "idError": "string",  
+                   "descriptionError": "string"  
+                } 
+       ] 
+   } 
+  ], 
+  "requestErrorList":  
+   [  
+           {  
+               "idError": "string",  
+                   "descriptionError": "string"  
+                } 
+    ] 
+} 
+ 
+ 
+4.5.23 Tipo de Comunicação 
+( X ) Síncrono  
+(    ) Assíncrono 
+(    ) One Way 
+ 
+4.5.24 Protocolo de Transporte HTTPS 
+ 
+4.5.25 Formato da Mensagem 
+REST 
+ 
+------------------------------------------------------------------------------------------------------------------------------ 
+4.5.26 Parâmetro de cabeçalho 
+ 
+Nome     Tipo     Obrigatório     Descrição 
+Username String   S                Identificador do Usuário que invocou o serviço. 
+Password String   S                Token de acesso ao serviço. 
+ 
+-------------------------------------------------------------------------------------------------------------------------------
+
+4.5.27 - Parâmetros de Entrada 
+
+Nome       Tipo     Obrigatório     Descrição
+
+--------------------------------------------------------------------------------------------------------------------------------
+
+schemaVersion
+String 
+S 
+Versão do schema do serviço, exemplo “1.0”
+--------------------------------------------------------------------------------------------------------------------------------
+ 
+taxRegistrationNumber 
+String 
+S 
+Número fiscal de contribuinte do emissor da factura.
+--------------------------------------------------------------------------------------------------------------------------------
+ 
+submissionUUID 
+String 
+N 
+Identificador (GUID ou UUID) da solicitação fornecido 
+pelo software. 
+N indica o variant (especifica o layout; para UUIDs 
+compatíveis com RFC 4122, os primeiros bits de N 
+devem estar entre 8 e b).  
+Exemplo:  
+550e8400-e29b-41d4-a716-446655440000  
+  
+Este identificador deverá ser único por cada requisição 
+do contribuinte emissor.
+------------------------------------------------------------------------------------------------------------------------------------
+
+taxRegistrationNumber 
+String 
+S 
+Número fiscal de Contribuinte
+-------------------------------------------------------------------------------------------------------------------------------------
+
+submissionTimeStamp 
+String 
+S 
+Timestamp de submissão do pedido no formato ISO 
+8601, exemplos:  
+"2025-05-27T14:30:00Z" (em UTC)  
+"2025-05-27T14:30:00-03:00" (com informação de timezone)
+-------------------------------------------------------------------------------------------------------------------------------------
+
+softwareInfo 
+Objecto 
+S 
+Objecto com os dados do Software de Facturação
+---------------------------------------------------------------------------------------------------------------------------------------
+     
+softwareInfoDetail 
+Objecto 
+S 
+Objecto com os detalhes do Software de Facturação
+------------------------------------------------------------------------------------------------------------------------------------------
+
+                                   
+productId 
+String 
+S 
+Nome do Software de Facturação.
+--------------------------------------------------------------------------------------------------------------------------------------------
+  
+                                    
+productVersion 
+String 
+S 
+Versão do Software de Facturação.
+----------------------------------------------------------------------------------------------------------------------------------------------- 
+                                    
+softwareValidationNumber 
+String 
+S 
+Número de Certificação do Software de Facturação.
+-------------------------------------------------------------------------------------------------------------------------------------------------- 
+          
+jwsSoftwareSignature 
+String 
+S 
+Assinatura digital do Software de Facturação usando a 
+chave privada do software, através o algoritmo RS256  (RSA + SHA-256).   
+Todos os campos do objecto softwareInfo devem ser usados na assinatura.
+----------------------------------------------------------------------------------------------------------------------------------------------------
+   
+jwsSignature 
+String 
+S 
+Assinatura digital da solicitação usando a chave privada 
+do emissor através do algoritmo RS256 (RSA + SHA-
+256). Os campos a serem utilizados na assinatura são:    
+• taxRegistrationNumber  
+• requestID
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+ 
+seriesYear 
+String 
+S 
+Ano de emissão associado à série de numeração das facturas. De 1 de Janeiro até 15 de Dezembro é possível 
+criar séries somente para o ano de sistema, após essa data é possível criar séries para o ano de sistema e para 
+o ano imediatamente posterior ao do sistema. 
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+documentType 
+String 
+S 
+Tipo de documento de facturação electrónica, com os 
+seguintes valores possíveis e significados: 
+• FA - Factura de Adiantamento 
+• FT - Factura 
+• FR - Factura/Recibo 
+• FG - Factura Global 
+• GF - Factura Genérica 
+• AC - Aviso de Cobrança 
+• AR - Aviso de Cobrança/Recibo 
+• TV - Talão de Venda 
+• RC - Recibo Emitido 
+• RG - Outros Recibos Emitidos 
+• RE - Estorno ou Recibo de Estorno 
+• ND - Nota de Débito 
+• NC - Nota de Crédito 
+• AF - Factura/Recibo de Autofacturação 
+• RP - Prémio ou Recibo de Prémio 
+• RA - Resseguro Aceite 
+• CS - Imputação a Co-seguradoras
+ 
+LD - Imputação a Co-seguradora Líder
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+establishmentNumber 
+String 
+S 
+Identifica o estabelecimento que solicita a emissão de 
+facturas. Este campo garante que cada série de contingência esteja unicamente associada ao respectivo 
+estabelecimento dentro da organização do contribuinte.
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+seriesContingencyIndicator 
+String 
+S 
+Indicador que identifica se a série de numeração de 
+facturas se destina a emissão em regime de 
+contingência, com os seguintes valores possíveis e 
+significados: 
+N – Série do regime normal de emissão; 
+C – Série criada para suportar a emissão em contingência. 
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+4.5.28 - Parâmetros de Saída 
+
+Nome       Tipo      Obrigatório       Descrição
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+resultCode 
+String 
+N 
+Resultado do processamento da solicitação de 
+registo de facturas, com os seguintes valores 
+possíveis e significados:  
+• 0 - Processamento concluído, sem facturas inválidas;  
+• 1 - Processamento concluído, com facturas válidas e facturas inválidas;  
+• 2 - Processamento concluído, sem facturas válidas;  
+7 - Solicitação não respondida por ser prematura ou repetitiva, devendo aguardar período mínimo para repetir este pedido;
+8 - Processamento ainda em curso;
+9 - Processamento cancelado.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- 
+
+errorList 
+Array 
+N 
+Array com os erros encontrados no processamento do documento de facturação identificado no campo documentNo, sendo 
+obrigatório quando documentStatus for “I”.  Terá uma linha para cada erro encontrado.  
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------            
+idError 
+ 
+S 
+Código de erro
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+              
+descriptionError 
+S 
+Descrição do erro
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+errorList 
+Array 
+N 
+Nome do contribuinte
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+             
+idError 
+String 
+S 
+Código de erro 
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- 
+              
+descriptionError 
+String 
+S 
+Descrição do erro
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ 
+seriesFEResult 
+Objecto 
+N 
+Resultado do pedido efectuado com sucesso 
+sendo devolvido um object do tipo seriesFEResult com os dados da quantidade 
+e 1ª e última facturas com emissão autorizada pela AGT para a série solicitada.
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+seriesCode 
+string 
+Sim 
+Código da série de numeração de facturas electrónicas atribuído pela AGT para a 
+solicitação efectuada, de acordo com a regra de numeração única de series definida.
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ 
+
+authorizedQuantity 
+integer 
+Sim 
+Quantidade de facturas que a AGT aprovou para emissão nesta solicitação, serão 
+seguidas as orientações das regras FE-RNG-082 e FE-RNG-083.
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+firstDocumentNo 
+string 
+Sim 
+Identificador da primeira factura electrónica 
+que se possibilita a emissão na nova série ou extensão de série já existente.
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+lastDocumentNo 
+string 
+Sim 
+Identificador da última factura electrónica 
+que se possibilita a emissão na nova série ou extensão de série já existente.
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  
+ 
+4.6 Listar Séries 
+ 
+4.6.29 - Interface do Serviço 
+REST 
+
+Endpoint: https://sifphml.minfin.gov.ao/sigt/fe/v1/listarSeries 
+
+Request Exemplo (Accept: application/json): 
+ 
+{ 
+  "schemaVersion": "string", 
+  "taxRegistrationNumber": "string", 
+  "submissionTimeStamp": "string", 
+  "seriesCode": "string", 
+  "seriesYear": "string", 
+  "seriesStatus": "string", 
+  "documentType": "string", 
+  "establishmentNumber": "string", 
+  "jwsSignature": "string", 
+  "softwareInfo": { 
+    "softwareInfoDetail": { 
+            "productId": "string", 
+            "productVersion": "string", 
+            "softwareValidationNumber": "string" 
+        }, 
+        "jwsSoftwareSignature": "string" 
+  } 
+} 
+ 
+
+Response Exemplo (Accept: application/json): 
+ 
+{ 
+    "resultCode": "string", 
+    "errorList": [ ], 
+    "seriesResultCount": "string", 
+    "seriesInfo": [ 
+        { 
+            "id": "string", 
+            "seriesCode": ""string", 
+            "seriesYear": "string", 
+            "seriesStatus": "string", 
+            "documentType": "string", 
+            "seriesCreationDate": "string", 
+            "firstDocumentCreated": "string", 
+            "lastDocumentCreated": "string", 
+            "firstDocumentNumber": "string", 
+            "invoicingMethod": "string", 
+            "nif": "string", 
+            "nome": "string", 
+            "dataAdesao": "string", 
+            "tipoAdesao": "string" 
+        } 
+    ] 
+} 
+ 
+4.6.30 Tipo de Comunicação 
+( X ) Síncrono  
+(    ) Assíncrono 
+(    ) One Way 
+ 
+4.6.31 Protocolo de Transporte 
+HTTPS 
+ 
+4.6.32 Formato da Mensagem 
+SOAP e REST 
+ 
+ 
+4.6.33 Parâmetro de cabeçalho 
+ 
+Nome      Tipo        Obrigatório        Descrição
+---------------------------------------------------------------------------------------------------------------------------- 
+Username   String     S                 Identificador do Usuário que invocou o serviço. 
+  
+Password   String     S                  Token de acesso ao serviço. 
+ 
+4.6.34 - Parâmetros de Entrada
+
+Nome      Tipo      Obrigatório      Descrição 
+-----------------------------------------------------------------------------------------------------------------------------
+
+schemaVersion 
+String 
+S 
+Versão do schema do serviço, exemplo “1.0”
+-----------------------------------------------------------------------------------------------------------------------------
+
+taxRegistrationNumber 
+String 
+S 
+Número fiscal de contribuinte do emissor da factura.
+------------------------------------------------------------------------------------------------------------------------------
+
+submissionTimeStamp 
+String 
+S 
+Timestamp de submissão do pedido no formato ISO 
+8601, exemplos:  
+"2025-05-27T14:30:00Z" (em UTC)  
+"2025-05-27T14:30:00-03:00" (com informação de timezone)
+----------------------------------------------------------------------------------------------------------------------------------
+
+seriesCode 
+String 
+N 
+Código da série de numeração de facturas electrónicas 
+atribuído pela AGT para a solicitação efectuada, de acordo com a regra de numeração única de series definida.
+-------------------------------------------------------------------------------------------------------------------------------------
+
+seriesYear 
+String 
+N 
+Ano de emissão associado à série de numeração das facturas. De 1 de Janeiro até 15 de Dezembro é possível 
+criar séries somente para o ano de sistema, após essa data é possível criar séries para o ano de sistema e para 
+o ano imediatamente posterior ao do sistema.
+----------------------------------------------------------------------------------------------------------------------------------------
+
+seriesStatus 
+String 
+N 
+Estado da série de numeração da facturação, com 
+os seguintes valores possíveis e significados:  
+• A - Série aberta  
+• U - Série em utilização  
+F - Série fechada (após expirado o respectivo ano de emissão ou, quando a serie se refere a emissão 
+em contingência se terminado o respectivo período de emissão).
+----------------------------------------------------------------------------------------------------------------------------------------------
+
+documentType 
+String 
+N 
+Tipo de documento de facturação electrónica, com os 
+seguintes valores possíveis e significados: 
+• FA - Factura de Adiantamento 
+• FT - Factura 
+• FR - Factura/Recibo 
+• FG - Factura Global 
+• GF - Factura Genérica 
+• AC - Aviso de Cobrança 
+• AR - Aviso de Cobrança/Recibo 
+• TV - Talão de Venda 
+• RC - Recibo Emitido 
+• RG - Outros Recibos Emitidos 
+• RE - Estorno ou Recibo de Estorno 
+• ND - Nota de Débito 
+• NC - Nota de Crédito 
+• AF - Factura/Recibo de Autofacturação 
+• RP - Prémio ou Recibo de Prémio 
+• RA - Resseguro Aceite 
+• CS - Imputação a Co-seguradoras 
+LD - Imputação a Co-seguradora Líder
+-------------------------------------------------------------------------------------------------------------------------------------------------------
+
+establishmentNumber 
+String 
+S 
+Identifica o estabelecimento que solicita a emissão de 
+facturas. Este campo garante que cada série de contingência esteja unicamente associada ao respectivo estabelecimento dentro da organização do contribuinte.
+------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ 
+softwareInfo 
+Objecto 
+S 
+Objecto com os dados do Software de Facturação 
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ 
+          
+softwareInfoDetail 
+Objecto 
+S 
+Objecto com os detalhes do Software de Facturação
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+                                    
+productId 
+String 
+S 
+Nome do Software de Facturação.
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+                                    
+productVersion 
+String 
+S 
+Versão do Software de Facturação.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+                                    
+softwareValidationNumber 
+String 
+S 
+Número de Certificação do Software de Facturação.
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ 
+          
+jwsSoftwareSignature 
+String 
+S 
+Assinatura digital do Software de Facturação usando a 
+chave privada do software, através o algoritmo RS256  (RSA + SHA-256).   
+Todos os campos do objecto softwareInfo devem ser usados na assinatura.
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------   
+
+jwsSignature 
+String 
+S 
+Assinatura digital da solicitação usando a chave privada do emissor através do algoritmo RS256 (RSA + SHA-
+256). Os campos a serem utilizados na assinatura são:    
+• taxRegistrationNumber  
+• requestID   
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+4.6.35 - Parâmetros de Saída
+ 
+Nome        Tipo        Obrigatório        Descrição
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+resultCode 
+String 
+N 
+Resultado do processamento da solicitação de registo de facturas, com os seguintes valores possíveis e significados:  
+• 0 - Processamento concluído, sem facturas inválidas;  
+• 1 - Processamento concluído, com facturas válidas e facturas inválidas;  
+• 2 - Processamento concluído, sem facturas válidas;  
+7 - Solicitação não respondida por ser prematura ou repetitiva, devendo aguardar período mínimo para repetir este pedido;
+8 - Processamento ainda em curso;
+9 - Processamento cancelado.
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- 
+
+errorList 
+Array 
+N 
+Array com os erros encontrados no 
+processamento do documento de facturação 
+identificado no campo documentNo, sendo 
+obrigatório quando documentStatus for “I”.  
+Terá uma linha para cada erro encontrado.
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- 
+              
+idError 
+S 
+Código de erro
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+              
+descriptionError 
+S 
+Descrição do erro
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+seriesResultCount 
+Int 
+S 
+Número de séries encontradas na pesquisa 
+realizada e para os critérios de pesquisa 
+especificados.
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+seriesInfo 
+ 
+Array 
+N 
+Array com as séries encontradas. 
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+seriesCode  
+string  
+Não  
+Código da série de numeração de facturas electrónicas.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- 
+            
+seriesYear  
+integer  
+Não  
+Ano de emissão associado à série de numeração das facturas. 
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+            
+documentType  
+string  
+Não  
+Tipo de documento de facturação electrónica, com  os  seguintes  
+valores  possíveis  
+e significados:  
+• FA - Factura de Adiantamento  
+• FT - Factura  
+• FR - Factura/Recibo  
+• FG - Factura Global  
+• GF – Factura Genérica  
+• AC - Aviso de Cobrança  
+• AR - Aviso de Cobrança/Recibo  
+• TV - Talão de Venda  
+• RC - Recibo Emitido  
+• RG - Outros Recibos Emitidos  
+• RE - Estorno ou Recibo de Estorno  
+• ND - Nota de Débito  
+• NC - Nota de Crédito  
+• AF - Factura/Recibo de Autofacturação  
+• RP - Prémio ou Recibo de Prémio  
+• RA - Resseguro Aceite  
+• CS - Imputação a Co-seguradoras  
+LD - Imputação a Co-seguradora Líder
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+            
+seriesStatus  
+string  
+Não  
+Estado da série de numeração da 
+facturação, com os seguintes valores possíveis e significados:  
+• A - Série aberta  
+• U - Série em utilização  
+F - Série fechada (após expirado o respectivo ano de emissão ou, quando a serie se refere a emissão em contingência se terminado o respectivo período de emissão).
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+            
+seriesCreationDate  
+string  
+Sim  
+Data de criação da série electrónica
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+            
+firstDocumentCreated  
+string  
+Sim  
+Número do primeiro documento de facturação criado na série  
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+lastDocumentCreated  
+string
+N
+ão  
+Última factura criada na série (desde que já tenha sido utilizada na criação de facturas)
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+            
+invoicingMethod  
+string  
+Sim  
+Qual o método para geração das facturas, com os seguintes valores possíveis e significados:  
+• FEPC – Facturação electrónica com emissão no Portal do Contribuinte  
+• FESF – Facturação electrónica com emissão via Software de Facturação  
+SF – Facturação não electrónica com emissão via Software de Facturação
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- 
+            
+seriesContingencyIndicator  
+string  
+Sim  
+Indicador que identifica se a série de numeração de facturas foi criada em regime de contingência, com os seguintes 
+valores possíveis e significados:  
+N – Série do regime normal de emissão; 
+C – Série criada para suportar a emissão em contingência.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- 
+            
+seriesStartTS  
+string  
+Não  
+Timestamp de início do período de emissão em contingência - formato ISO 8601 (YYYYMM-DDThh:mm:ss). Passa 
+a preenchimento obrigatório caso a serie se refira a emissão em contingência (seriesContingencyIndicator = “C”).
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- 
+             
+seriesEndTS  
+string  
+Não  
+Timestamp de fim do período de emissão em contingência - formato ISO 8601 (YYYYMM-DDThh:mm:ss). Passa a 
+preenchimento obrigatório caso a serie se refira a emissão em contingência (seriesContingencyIndicator = “C”).  
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- 
+ 
+4.7 Validar Documento 
+ 
+4.7.36 Interface do Serviço
+
+REST 
+
+Endpoint: https://sifphml.minfin.gov.ao/sigt/fe/v1/validarDocumento 
+ 
+Request Exemplo (Accept: application/json): 
+{ 
+    "schemaVersion": "string", 
+    "submissionTimeStamp": "string", 
+    "taxRegistrationNumber": "string", 
+    "softwareInfo": { 
+    "softwareInfoDetail": { 
+            "productId": "string", 
+            "productVersion": "string", 
+            "softwareValidationNumber": "string" 
+        }, 
+        "jwsSoftwareSignature": "string" 
+  }, 
+  "jwsSignature": "string", 
+  "documentNo": "string", 
+  "action": "string", 
+  "deductibleVATPercentage": "string", 
+  "nonDeductibleAmount": "string" 
+} 
+ 
+Response Exemplo (Accept: application/json): 
+ 
+{ 
+    "actionResultCode": "string", 
+    "documentStatusCode": "string", 
+    "errorList": [  
+           { 
+             "idError": "string", 
+            "documentNo": "string", 
+            "descriptionError": "string", 
+           } 
+    ] 
+} 
+ ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+4.7.37 Tipo de Comunicação 
+( X ) Síncrono  
+(    ) Assíncrono 
+(    ) One Way 
+ 
+4.7.38 Protocolo de Transporte HTTPS 
+ 
+4.7.39 Formato da Mensagem
+
+REST 
+ 
+ 
+4.7.40 Parâmetro de cabeçalho 
+ 
+Nome        Tipo    Obrigatório    Descrição 
+Username    String  S              Identificador do Usuário que invocou o serviço. 
+Password    String  S              Token de acesso ao serviço. 
+ 
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+4.7.41 - Parâmetros de Entrada
+
+Nome      Tipo     Obrigatório    Descrição 
+
+schemaVersion 
+String 
+S 
+Versão do schema do serviço, exemplo “1.0”
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+taxRegistrationNumber 
+String 
+S 
+Número fiscal de contribuinte do emissor da factura.
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+submissionTimeStamp 
+String 
+S 
+Timestamp de submissão do pedido no formato ISO 
+8601, exemplos:   
+"2025-05-27T14:30:00Z" (em UTC)  
+"2025-05-27T14:30:00-03:00" (com informação de timezone)
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+softwareInfo 
+Objecto 
+S 
+Objecto com os dados do Software de Facturação
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+          
+softwareInfoDetail 
+Objecto 
+S 
+Objecto com os detalhes do Software de Facturação
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- 
+                                    
+productId 
+String 
+S 
+Nome do Software de Facturação.
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+                                    
+productVersion 
+String 
+S 
+Versão do Software de Facturação.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+                                    
+softwareValidationNumber 
+String 
+S 
+Número de Certificação do Software de Facturação.
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+          
+jwsSoftwareSignature 
+String 
+S 
+Assinatura digital do Software de Facturação usando a 
+chave privada do software, através o algoritmo RS256  (RSA + SHA-256). Todos os campos do objecto softwareInfo devem ser usados na assinatura.
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+jwsSignature 
+String 
+S 
+Assinatura digital da solicitação usando a chave privada 
+do emissor através do algoritmo RS256 (RSA + SHA-
+256). Os campos a serem utilizados na assinatura são:    
+• taxRegistrationNumber  
+• requestID
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------   
+
+documentNo  
+string  
+Sim  
+Identificador do documento de facturação que se pretende confirmar/rejeitar.
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+action  
+string  
+Sim  
+Acção que o adquirente pretende aplicar ao documento de facturação emitido, com os seguintes valores possíveis e significados:  
+• C – Confirmação do documento  
+• R – Rejeição do documento
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ 
+deductibleVATPercentage  
+number  Não  
+Percentagem de IVA dedutível a considerar para o 
+documento em análise sendo utilizado quando 
+action for “C” (confirmação do documento) e o 
+tipo de documento não for considerado recibo nem 
+nota de crédito. Caso este campo não esteja 
+preenchido será considerado que o contribuinte 
+não tem direito a dedução.  Só  um  dos  campos 
+deductibleVATPercentage  e nonDeductibleAmount  poderá  estar preenchido.
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  
+nonDeductibleAmount  
+number  Não  
+Valor do documento que não é sujeito a dedução 
+de IVA. Este campo deve ser preenchido sempre 
+que parte do montante da fatura não possa ser deduzido pelo contribuinte (ex.: despesas não 
+dedutíveis fiscalmente, limites legais ou situações específicas previstas na legislação). Caso este campo não seja preenchido, será 
+considerado que a totalidade    do valor do documento é dedutível.  Só um dos campos deductibleVATPercentage e nonDeductibleAmount  poderá  estar preenchido.
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------   
+ 
+
+ 
+4.7.42 - Parâmetros de Saída 
+
+Nome     Tipo     Obrigatório     Descrição
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+actionResultCode 
+String 
+N 
+Código de resultado da solicitação, com os 
+seguintes valores possíveis e significados:  
+• C_OK – Confirmação do documento com sucesso  
+• R_OK – Rejeição do documento com sucesso  
+• C_NOK – Confirmação do documento não  possível  
+• R_NOK – Rejeição do documento não possível
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+documentStatusCode
+String 
+N 
+Código de estado em que o documento a actualizar foi encontrado antes de tentada a realização desta acção, com os seguintes valores possíveis e significados:  
+• S_A – Anulado  
+• S_C – Confirmado  
+• S_I – Inválido   
+• S_RG – Registado  
+• S_RJ – Rejeitado  
+* S_V – Válido
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+errorList 
+Array 
+N 
+Array com os erros encontrados no 
+processamento do documento de facturação 
+identificado no campo documentNo, sendo 
+obrigatório quando documentStatus for “I”.  Terá uma linha para cada erro encontrado.
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+              
+idError 
+S 
+Código de erro
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------  
+              
+descriptionError 
+S 
+Descrição do erro
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+             
+documentNo  
+Número do documento de facturação a que se refere o erro (campo com o mesmo nome 
+transmitido nos parâmetros de entrada). Campo passa a obrigatório se erro ocorrer num dos parâmetros incluídos no array 
+documents.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+Tabelas de Refêrencias 
+    
+5 Tabelas de Refêrencias 
+ 
+5.1  Códigos dos Erros 
+ 
+ 
+ 
+Código         Descrição 
+200             Registo ou consulta de efectuado com sucesso. 
+400             Registo de pedido efectuado com erros, sendo devolvida uma lista de erros na recepção dos dados do pedido de registo dos documentos de facturação.  
+422             Chamada ocorreu com erro, sendo enviado uma mensagem (código e descrição) correspondente ao erro “E94” - “erro na chamada, nif diferente”  
+429             Chamada ocorreu com erro, sendo enviado uma mensagem (código e descrição) correspondente ao erro “E98” - “erro na chamada, demasiadas solicitações repetidas” 
+400             Chamada ocorreu com erro, sendo enviado uma mensagem (código e descrição) correspondente ao erro “E93” - “documento desconhecido” 
+ 
+ 
+Gerenciamento e Registro  
+6 Gerenciamento e Registro 
+
+6.1 Monitoramento e Execução de SLA 
+
+Não haverá monitoramento de SLAs. 
+6.2 Gerenciamento de Exceção 
+Não existem ações automáticas a serem tomadas em caso de falha de SLA ou em caso de situações não 
+esperadas, em casos de falhas na camada OSB poderá ser executado o reprocessamento manual. Em caso 
+de falhas na camada SOA Suite poderá ser executado o reprocessamento manual (recovery). 
+6.3 Logging 
+As informações do serviço serão armazenadas em dois momentos: 
+1. Camada OSB armazenará os dados em arquivos de log default da ferramenta. 
+2. Camada SOA Suite armazenará os dados nas tabelas de infra-estrutura default da ferramenta. 

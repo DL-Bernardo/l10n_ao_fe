@@ -4,18 +4,50 @@
         <field name="model">account.move</field>
         <field name="inherit_id" ref="account.view_move_form"/>
         <field name="arch" type="xml">
-            <button name="action_post" position="after">
-                <button name="action_send_fe" type="object" string="Enviar AGT" class="btn-primary"/>
-            <button name="action_check_fe_status" type="object" string="Consultar Estado AGT" 
-                    attrs="{'invisible': [('fe_request_id', '=', False)]}"/>
-            </button>
-            <field name="journal_id" position="after">
-                <field name="fe_status"/>
-                <field name="fe_request_id"/>
+            <header position="inside">
+                <button name="action_send_fe_agt" type="object" string="Enviar FE AGT" class="btn-danger" 
+                        invisible="state != 'posted' or fe_status in ('sent', 'validated')"/>
+                
+                <button name="action_download_fe" type="object" string="Baixar Factura Electrónica" class="btn-success"
+                        invisible="fe_status not in ('sent', 'validated')"/>
+                
+                <button name="open_payload_wizard" type="object" string="Payload JSON" class="btn-success"/>
+                
+                <button name="open_obter_estado_wizard" type="object" string="Obter Estado" class="btn-primary"/>
+                
+                <button name="open_consultar_factura_wizard" type="object" string="Consultar Factura" class="btn-primary"/>
+                
+                <button name="open_listar_facturas_wizard" type="object" string="Listar Facturas" class="btn-primary"/>
+                
+                <button name="action_cancel_fe" type="object" string="Anular Factura" class="btn-danger"
+                        invisible="state != 'cancel'"/>
+            </header>
+            
+            <field name="state" position="before">
+                <field name="fe_status" widget="statusbar" statusbar_visible="not_sent,processing,sent,validated,error"/>
             </field>
+
             <xpath expr="//notebook" position="inside">
-                <page string="Payload AGT" name="agt_payload">
-                    <field name="l10n_ao_fe_payload_json" readonly="1"/>
+                <page string="Facturação Electrónica (AGT)" name="agt_fe">
+                    <group>
+                        <group string="Identificadores">
+                            <field name="fe_request_id"/>
+                            <field name="fe_submission_uuid"/>
+                            <field name="fe_document_hash"/>
+                        </group>
+                        <group string="Estado e Datas">
+                            <field name="fe_status"/>
+                            <field name="fe_sent_datetime"/>
+                        </group>
+                    </group>
+                    <group string="Assinaturas JWS">
+                        <field name="fe_jws_software_signature"/>
+                        <field name="fe_jws_document_signature"/>
+                    </group>
+                    <group string="Logs">
+                         <field name="fe_last_response"/>
+                         <field name="fe_error_list"/>
+                    </group>
                 </page>
             </xpath>
         </field>

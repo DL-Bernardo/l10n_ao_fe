@@ -2,10 +2,22 @@
     <template id="report_invoice_document_inherit_fe" inherit_id="account.report_invoice_document">
         <xpath expr="//table[@name='invoice_line_table']" position="after">
             <t t-if="o.fe_qr_code">
-                <div class="text-center" style="margin-top: 50px; page-break-inside: avoid;">
-                    <div style="display: inline-block; border: 1px solid #ccc; padding: 10px;">
-                        <p style="margin-bottom: 5px; font-size: 12px; font-weight: bold;">Consulta de Documento</p>
-                        <img t-att-src="'data:image/png;base64,%s' % o.fe_qr_code.decode('utf-8')" style="width: 120px; height: 120px;"/>
+                <div class="row mt-4" style="page-break-inside: avoid;">
+                    <div class="col-4 text-center">
+                        <div style="border: 1px solid #ccc; padding: 10px; display: inline-block;">
+                            <img t-att-src="'data:image/png;base64,%s' % o.fe_qr_code.decode('utf-8')" style="width: 120px; height: 120px;"/>
+                        </div>
+                        <div class="mt-1" style="font-size: 10px;">
+                            <strong>Processado por Computador</strong>
+                        </div>
+                    </div>
+                    <div class="col-8" style="font-size: 10px; word-wrap: break-word;">
+                        <div t-if="o.fe_document_hash">
+                            <strong>Hash:</strong> <span t-field="o.fe_document_hash"/>
+                        </div>
+                        <div t-if="o.fe_jws_software_signature" class="mt-1">
+                            <strong>Assinatura Software:</strong> <span t-field="o.fe_jws_software_signature"/>
+                        </div>
                     </div>
                 </div>
             </t>

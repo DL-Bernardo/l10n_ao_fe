@@ -18,14 +18,30 @@ _logger = logging.getLogger(__name__)
 class AccountMoveInherit(models.Model):
     _inherit = 'account.move'
 
-    fe_request_id = fields.Char(string='FE Request ID', readonly=True, copy=False, tracking=True)
+    fe_request_id = fields.Char(string='AGT Request ID', readonly=True, copy=False, tracking=True)
+    fe_submission_uuid = fields.Char(string="AGT Submission UUID", copy=False, readonly=True)
+    
     fe_status = fields.Selection([
-        ('not_sent', 'Não Enviada'),
+        ('not_sent', 'Não Enviado'),
         ('processing', 'Em Processamento'),
-        ('v', 'Válida'),
-        ('i', 'Inválida')
-    ], string="Estado AGT", default='not_sent', readonly=True, copy=False, tracking=True)
+        ('sent', 'Enviado'),
+        ('validated', 'Validado'),
+        ('error', 'Erro'),
+        ('cancelled', 'Anulado')
+    ], string="Estado FE", default='not_sent', copy=False, tracking=True)
+
+    fe_last_response = fields.Text(string="Última resposta AGT", copy=False, readonly=True)
+    fe_payload_json = fields.Text(string="Último Payload JSON", copy=False, readonly=True)
+    fe_document_hash = fields.Char(string="Hash AGT", copy=False, readonly=True)
+    
+    fe_jws_document_signature = fields.Text(string="JWS Document Signature", copy=False, readonly=True)
+    fe_jws_software_signature = fields.Text(string="JWS Software Signature", copy=False, readonly=True)
+    
+    fe_sent_datetime = fields.Datetime(string="Data de Submissão AGT", copy=False, readonly=True)
+    fe_error_list = fields.Text(string="Lista de Erros", copy=False, readonly=True)
+
     fe_qr_code = fields.Binary(string="QR Code AGT", readonly=True, copy=False)
+    
     l10n_ao_fe_serie_id = fields.Many2one(
         'l10n_ao.fe.serie', 
         string="Série de FE", 
@@ -39,8 +55,7 @@ class AccountMoveInherit(models.Model):
         related='l10n_ao_fe_serie_id.document_class_id',
         store=True
     )
-    l10n_ao_fe_queue_ids = fields.One2many('l10n_ao.fe.queue', 'invoice_id', string='Fila de Envio AGT (Legado)')
-    l10n_ao_fe_payload_json = fields.Text(string="Payload JSON Enviado", readonly=True, copy=False)
+    l10n_ao_fe_queue_ids = fields.One2many('l10n_ao.fe.queue', 'invoice_id', string='Fila de Envio AGT')
 
     @api.onchange('journal_id')
     def _onchange_journal_id(self):
@@ -56,109 +71,122 @@ class AccountMoveInherit(models.Model):
             return self.name
         return self.name
 
-    def action_post(self):
-        """Assigns the sequence number upon validation."""
-        # The logic to set the name from the sequence should be handled by Odoo's standard mechanisms
-        # or a more specific module if custom logic is needed before posting.
-        return super(AccountMoveInherit, self).action_post()
-
-    def action_send_fe(self):
-        """Generates the payload, sends it directly to AGT, and handles the response."""
+    def action_send_fe_agt(self):
+        """Gera o payload, envia para AGT e processa a resposta."""
         service = self.env['l10n_ao.fe.service'].with_context(force_company=self.company_id.id)
         
         for move in self:
             if move.state != 'posted':
                 raise UserError(_("Apenas faturas no estado 'Lançado' podem ser enviadas à AGT."))
             
-            # if not move.l10n_ao_fe_serie_id:
-            #     raise UserError(_("Por favor, selecione uma 'Série de FE' para este documento antes de o enviar."))
-
             move.write({'fe_status': 'processing'})
             move.message_post(body=_("A preparar e enviar para a AGT..."))
 
             try:
-                # 1. Gerar o payload
-                payload_json = service._generate_invoice_payload(move)
-                move.l10n_ao_fe_payload_json = payload_json
-
-                # 2. Enviar para a AGT
-                response = service._send_to_agt(payload_json)
+                # O método registar_factura do serviço já faz tudo: gera payload, assina, envia e loga.
+                response = service.registar_factura(move)
                 
-                # 3. Processar a resposta
+                # Processar resposta imediata
                 request_id = response.get("requestID")
                 doc_status_info = response.get('documents', [{}])[0]
                 doc_status = doc_status_info.get('documentStatus', 'processing')
-                
-                status_mapping = {'V': 'v', 'I': 'i'}
-                final_status = status_mapping.get(doc_status, 'processing')
+                error_list = doc_status_info.get('errorList', [])
 
+                # Status mapping based on AGT spec
+                # V = Valid, I = Invalid, N = Received/Normal?
+                # If we get a requestID, it's usually 'sent' or 'processing' until validated.
+                
+                final_status = 'sent'
+                if doc_status == 'V':
+                    final_status = 'validated'
+                elif doc_status == 'I' or error_list:
+                    final_status = 'error'
+                    error_msgs = "\n".join([f"({e.get('idError')}) {e.get('descriptionError')}" for e in error_list])
+                    move.fe_error_list = error_msgs
+                
                 move.write({
                     'fe_request_id': request_id,
                     'fe_status': final_status,
+                    'fe_last_response': json.dumps(response, indent=2, ensure_ascii=False)
                 })
 
-                msg = _("Enviado com sucesso para a AGT.<br/>- Request ID: %s<br/>- Estado do Documento: %s", request_id, final_status)
-                if final_status == 'i':
-                    error_list = doc_status_info.get('errorList', [])
-                    errors = [f"({e.get('idError')}) {e.get('descriptionError')}" for e in error_list]
-                    msg += _("<br/><b>Erros reportados:</b><br/>%s", "<br/>".join(errors))
-
+                msg = _("Enviado para a AGT.<br/>- Request ID: %s<br/>- Estado: %s", request_id, final_status)
                 move.message_post(body=msg)
 
-            except UserError as e:
-                move.write({'fe_status': 'not_sent'})
-                move.message_post(body=_("<b>Falha ao enviar para AGT:</b> %s", e.args[0]))
-                # Don't re-raise UserError to avoid generic RPC error dialog
             except Exception as e:
-                _logger.exception("Erro inesperado ao enviar fatura para AGT.")
-                move.write({'fe_status': 'not_sent'})
-                move.message_post(body=_("<b>Ocorreu um erro inesperado:</b> %s", e))
-                # Re-raise to show traceback in logs for debugging
-                raise
+                move.write({'fe_status': 'error'})
+                move.message_post(body=_("<b>Falha ao enviar para AGT:</b> %s", str(e)))
+                # Não faz raise para não bloquear a UI, mas loga o erro no chatter
 
-    def action_check_fe_status(self):
-        """Consulta o estado da fatura na AGT usando o submissionUUID."""
+    def action_download_fe(self):
+        """Gera e descarrega o PDF da Fatura Electrónica."""
+        # Lógica para gerar PDF específico ou usar o report padrão com QR Code
+        # Por agora, retorna o report padrão
+        return self.env.ref('account.account_invoices').report_action(self)
+
+    def open_payload_wizard(self):
+        """Abre o wizard para mostrar o payload JSON."""
         self.ensure_one()
-        if not self.fe_request_id:
-            raise UserError(_("Não há um 'FE Request ID' para consultar o estado desta fatura."))
+        # Se já tiver payload gerado, mostra esse. Se não, gera um preview.
+        if self.fe_payload_json:
+            payload = self.fe_payload_json
+        else:
+            payload = "O payload é gerado no momento do envio. Clique em 'Enviar FE AGT' para gerar."
 
-        service = self.env['l10n_ao.fe.service'].with_context(force_company=self.company_id.id)
+        return {
+            'name': _('Payload JSON'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'l10n_ao.fe.payload.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {'default_json_payload': payload}
+        }
 
-        try:
-            # 1. Consultar o estado na AGT
-            response = service._get_agt_status(self.fe_request_id)
+    def open_obter_estado_wizard(self):
+        self.ensure_one()
+        return {
+            'name': _('Obter Estado AGT'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'l10n_ao.fe.get.state.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_request_id': self.fe_request_id,
+                'default_tax_registration_number': self.company_id.vat
+            }
+        }
 
-            # 2. Processar a resposta
-            # Assuming the response structure from AGT's ObterEstado endpoint
-            # This part might need adjustment based on actual AGT API documentation
-            status_info = response.get('statusInfo', {})
-            agt_status_code = status_info.get('statusCode')
-            agt_status_message = status_info.get('statusMessage')
+    def open_consultar_factura_wizard(self):
+        self.ensure_one()
+        return {
+            'name': _('Consultar Fatura AGT'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'l10n_ao.fe.consult.invoice.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_document_no': self.name,
+                'default_tax_registration_number': self.company_id.vat
+            }
+        }
 
-            new_fe_status = self.fe_status # Default to current status
-            if agt_status_code == 'V': # Valid
-                new_fe_status = 'v'
-            elif agt_status_code == 'I': # Invalid
-                new_fe_status = 'i'
-            elif agt_status_code == 'P': # Pending (or similar)
-                new_fe_status = 'processing'
-            # Add other status mappings as needed
+    def open_listar_facturas_wizard(self):
+        return {
+            'name': _('Listar Faturas AGT'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'l10n_ao.fe.list.invoices.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_tax_registration_number': self.env.company.vat
+            }
+        }
 
-            self.write({
-                'fe_status': new_fe_status,
-                # Optionally store the full response for debugging/auditing
-                # 'l10n_ao_fe_response_json': json.dumps(response, indent=2, ensure_ascii=False),
-            })
-
-            msg = _("Estado da fatura atualizado pela AGT:<br/>- Código: %s<br/>- Mensagem: %s", agt_status_code, agt_status_message)
-            self.message_post(body=msg)
-
-        except UserError as e:
-            self.message_post(body=_("<b>Falha ao consultar estado na AGT:</b> %s", e.args[0]))
-        except Exception as e:
-            _logger.exception("Erro inesperado ao consultar estado da fatura na AGT.")
-            self.message_post(body=_("<b>Ocorreu um erro inesperado ao consultar estado:</b> %s", e))
-            raise
+    def action_cancel_fe(self):
+        """Anula a fatura na AGT (se suportado) e localmente."""
+        # Implementar lógica de anulação AGT se houver endpoint específico ou processo
+        self.write({'fe_status': 'cancelled'})
+        return self.button_cancel()
 
     # =====================================================
     # MÉTODO PARA GERAR O QR CODE (PADRÃO AGT)

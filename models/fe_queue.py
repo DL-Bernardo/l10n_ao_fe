@@ -1,5 +1,7 @@
-from odoo import models, fields, api
+# -*- coding: utf-8 -*-
+from odoo import models, fields, api, _
 import logging
+import json
 
 _logger = logging.getLogger(__name__)
 
@@ -24,27 +26,30 @@ class FEQueue(models.Model):
     def action_send(self):
         self.ensure_one()
         service = self.env['l10n_ao.fe.service']
-        company = self.invoice_id.company_id
-        documents = [self.payload]
+        
+        try:
+            # O serviço agora espera um account.move
+            response = service.registar_factura(self.invoice_id)
+            
+            request_id = response.get("requestID")
+            doc_status_info = response.get('documents', [{}])[0]
+            doc_status = doc_status_info.get('documentStatus', 'processing')
+            
+            self.attempts += 1
+            self.last_response = json.dumps(response, indent=2, ensure_ascii=False)
+            self.request_id = request_id
+            
+            if doc_status == 'I':
+                 error_list = doc_status_info.get('errorList', [])
+                 self.state = 'error'
+                 self.error_list = "\n".join([f"({e.get('idError')}) {e.get('descriptionError')}" for e in error_list])
+            else:
+                 self.state = 'processing'
+                 self.error_list = False
 
-        code, resp = service.registar_facturas(company, documents)
-
-        self.attempts += 1
-        self.last_response = str(resp)
-
-        if code in (200, 202) and resp.get('requestID'):
-            self.write({
-                'request_id': resp['requestID'],
-                'state': 'processing',
-                'error_list': False,
-            })
-        else:
+        except Exception as e:
             self.state = 'error'
-            # Use the centralized error handler to get a user-friendly message
-            try:
-                service._handle_error_response(code, resp)
-            except UserError as e:
-                self.error_list = str(e)
+            self.error_list = str(e)
 
     def action_obter_estado(self):
         self.ensure_one()
@@ -52,63 +57,37 @@ class FEQueue(models.Model):
             return
         
         service = self.env['l10n_ao.fe.service']
-        code, resp = service.obter_estado(self.request_id, self.invoice_id.company_id)
-        self.last_response = str(resp)
-
-        if code != 200:
-            self.state = 'error'
-            try:
-                service._handle_error_response(code, resp)
-            except UserError as e:
-                self.error_list = str(e)
-            return
-
-        result_code = resp.get('resultCode')
-        if result_code in ('0', '1', '2'): # Processamento concluído
-            doc_status_list = resp.get('documentStatusList', [])
-            if not doc_status_list:
-                return
-
-            doc_status = doc_status_list[0]
-            final_status = doc_status.get('documentStatus')
-            self.invoice_id.fe_status = final_status.lower()
-
-            if final_status == 'I': # Inválida
-                self.state = 'error'
-                try:
-                    # Pass the specific error list for this document
-                    service._handle_error_response(code, {'errorList': doc_status.get('errorList', [])})
-                except UserError as e:
-                    self.error_list = str(e)
-                self.invoice_id.message_post(body=_("Fatura marcada como inválida pela AGT.\n<br/><b>Erros:</b><br/>%s", self.error_list))
-            else: # Válida
+        try:
+            response = service.obter_estado(self.request_id, self.invoice_id.company_id.vat)
+            self.last_response = json.dumps(response, indent=2, ensure_ascii=False)
+            
+            status_info = response.get('statusInfo', {})
+            agt_status_code = status_info.get('statusCode')
+            
+            if agt_status_code == 'V':
                 self.state = 'done'
-                self.error_list = False
-                self.invoice_id.message_post(body=_("Fatura validada com sucesso pela AGT."))
+                self.invoice_id.fe_status = 'validated'
                 self.invoice_id.generate_qr_code()
-
-        elif result_code in ('8',): # Ainda em processamento
-            _logger.info(f"Fatura {self.invoice_id.name} ainda em processamento na AGT.")
-        else: # Outro tipo de erro no pedido
+            elif agt_status_code == 'I':
+                self.state = 'error'
+                self.invoice_id.fe_status = 'error'
+                # Extrair erros se houver
+            
+        except Exception as e:
             self.state = 'error'
-            try:
-                service._handle_error_response(code, resp)
-            except UserError as e:
-                self.error_list = str(e)
-
+            self.error_list = str(e)
 
     @api.model
     def _process_queue(self):
         _logger.info("A processar a fila de faturas da AGT...")
-        # Enviar faturas pendentes
-        pending_records = self.search([('state', '=', 'draft'), ('attempts', '<', 3)], limit=10)
+        # Enviar faturas pendentes (Rascunho ou Erro com < 3 tentativas)
+        pending_records = self.search([('state', 'in', ['draft', 'error']), ('attempts', '<', 3)], limit=10)
         for rec in pending_records:
             try:
                 rec.action_send()
                 self.env.cr.commit()
             except Exception as e:
                 _logger.error(f"Erro ao enviar fatura {rec.invoice_id.name}: {e}")
-                rec.write({'state': 'error', 'error_list': str(e)})
                 self.env.cr.commit()
 
         # Verificar estado de faturas em processamento
@@ -119,6 +98,5 @@ class FEQueue(models.Model):
                 self.env.cr.commit()
             except Exception as e:
                 _logger.error(f"Erro ao obter estado da fatura {rec.invoice_id.name}: {e}")
-                rec.write({'state': 'error', 'error_list': str(e)})
                 self.env.cr.commit()
         _logger.info("Processamento da fila de faturas da AGT concluído.")

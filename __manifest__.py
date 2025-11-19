@@ -14,6 +14,7 @@ Compatível com o ambiente de homologação 2025.
     'data': [
         'security/ir.model.access.csv',
         'data/ir_config_parameter.xml',
+        'data/ir_cron.xml',
         'data/fe_document_class_data.xml',
         'data/fe_error_code_data.xml',
         'views/account_tax_views.xml',
@@ -22,6 +23,8 @@ Compatível com o ambiente de homologação 2025.
         'views/fe_serie_views.xml',
         'wizard/fe_solicitar_serie_wizard_views.xml',
         'views/account_report_invoice_document.xml',
+        'views/fe_log_views.xml',
+        'views/wizard_views.xml',
     ],
     'installable': True,
     'application': False,

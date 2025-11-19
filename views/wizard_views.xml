@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- Payload Wizard -->
+    <record id="view_fe_payload_wizard_form" model="ir.ui.view">
+        <field name="name">l10n_ao.fe.payload.wizard.form</field>
+        <field name="model">l10n_ao.fe.payload.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Payload JSON">
+                <group>
+                    <field name="json_payload" widget="ace" options="{'mode': 'json'}"/>
+                </group>
+                <footer>
+                    <button string="Fechar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Get State Wizard -->
+    <record id="view_fe_get_state_wizard_form" model="ir.ui.view">
+        <field name="name">l10n_ao.fe.get.state.wizard.form</field>
+        <field name="model">l10n_ao.fe.get.state.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Obter Estado AGT">
+                <group>
+                    <field name="request_id"/>
+                    <field name="tax_registration_number"/>
+                </group>
+                <group string="Resposta">
+                    <field name="response_json" widget="ace" options="{'mode': 'json'}"/>
+                </group>
+                <footer>
+                    <button name="action_get_state" string="Consultar" type="object" class="btn-primary"/>
+                    <button string="Fechar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Consult Invoice Wizard -->
+    <record id="view_fe_consult_invoice_wizard_form" model="ir.ui.view">
+        <field name="name">l10n_ao.fe.consult.invoice.wizard.form</field>
+        <field name="model">l10n_ao.fe.consult.invoice.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Consultar Fatura AGT">
+                <group>
+                    <field name="document_no"/>
+                    <field name="tax_registration_number"/>
+                </group>
+                <group string="Resposta">
+                    <field name="response_json" widget="ace" options="{'mode': 'json'}"/>
+                </group>
+                <footer>
+                    <button name="action_consult" string="Consultar" type="object" class="btn-primary"/>
+                    <button string="Fechar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- List Invoices Wizard -->
+    <record id="view_fe_list_invoices_wizard_form" model="ir.ui.view">
+        <field name="name">l10n_ao.fe.list.invoices.wizard.form</field>
+        <field name="model">l10n_ao.fe.list.invoices.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Listar Faturas AGT">
+                <group>
+                    <field name="date_from"/>
+                    <field name="date_to"/>
+                    <field name="tax_registration_number"/>
+                </group>
+                <group string="Resposta">
+                    <field name="response_json" widget="ace" options="{'mode': 'json'}"/>
+                </group>
+                <footer>
+                    <button name="action_list" string="Listar" type="object" class="btn-primary"/>
+                    <button string="Fechar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

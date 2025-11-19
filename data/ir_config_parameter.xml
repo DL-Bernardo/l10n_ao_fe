@@ -17,9 +17,14 @@
             <field name="value">mfn28552025</field>
         </record>
 
-        <record id="l10n_ao_fe.private_key_path" model="ir.config_parameter">
+        <record id="l10n_ao_fe_private_key_path" model="ir.config_parameter">
             <field name="key">l10n_ao_fe.private_key_path</field>
-            <field name="value">/opt/keys_FE/ChavePrivada.pem</field>
+            <field name="value">/opt/keys_FE/ChavePrivadaSoftware.pem</field>
+        </record>
+
+        <record id="l10n_ao_fe_issuer_private_key_path" model="ir.config_parameter">
+            <field name="key">l10n_ao_fe.issuer_private_key_path</field>
+            <field name="value">/opt/keys_FE/ChavePrivadaEmissor.pem</field>
         </record>
 
         <record id="l10n_ao_fe.product_id" model="ir.config_parameter">

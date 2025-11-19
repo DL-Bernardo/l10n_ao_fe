@@ -23,7 +23,8 @@ Antes de enviar faturas, é necessário configurar os parâmetros de autenticaç
 | `l10n_ao_fe.base_url` | `https://sifphml.minfin.gov.ao/sigt/fe/v1` | URL da API (Homologação ou Produção) |
 | `l10n_ao_fe.username` | `seu_usuario_agt` | Utilizador fornecido pela AGT |
 | `l10n_ao_fe.password` | `sua_senha_agt` | Password fornecida pela AGT |
-| `l10n_ao_fe.private_key_path` | `/caminho/para/chave_privada.pem` | Caminho absoluto para o ficheiro `.pem` da chave privada |
+| `l10n_ao_fe.private_key_path` | `/caminho/para/chave_software.pem` | Chave Privada do SOFTWARE (Produtor) |
+| `l10n_ao_fe.issuer_private_key_path` | `/caminho/para/chave_emissor.pem` | Chave Privada do EMISSOR (Cliente) |
 | `l10n_ao_fe.product_id` | `DIGITALUB-FE` | ID do Produto Software Validado |
 | `l10n_ao_fe.product_version` | `1.0.0` | Versão do Software Validado |
 | `l10n_ao_fe.software_validation_number` | `0000/AGT/2025` | Número de Validação do Software |

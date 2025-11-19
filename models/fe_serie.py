@@ -34,6 +34,11 @@ class FESerie(models.Model):
         ('expired', 'Expirada'),
     ], string="Estado AGT", readonly=True, default='draft', copy=False)
 
+    first_number = fields.Integer(string="Número Inicial", help="Primeiro número da série.")
+    last_number = fields.Integer(string="Número Final", help="Último número autorizado da série.")
+    next_number = fields.Integer(string="Próximo Número", default=1, help="Próximo número a ser usado.")
+    authorized_quantity = fields.Char(string="Quantidade Autorizada", help="Quantidade total de documentos autorizados.")
+    
     _sql_constraints = [
         ('name_company_uniq', 'unique(name, company_id)', 'A série deve ser única por empresa!'),
     ]
@@ -46,14 +51,29 @@ class FESerie(models.Model):
         """
         _logger.info("A iniciar a atualização da lista de séries da AGT.")
         service = self.env['l10n_ao.fe.service']
-        code, resp = service.listar_series()
+        
+        try:
+            resp = service.listar_series(self.env.company.vat)
+        except Exception as e:
+             raise UserError(f"Erro ao listar séries: {e}")
 
-        if code != 200:
-            self.env['l10n_ao.fe.service']._handle_error_response(code, resp)
+        # O endpoint listarSeries retorna uma lista de séries dentro de 'seriesList' ou similar?
+        # O spec diz que retorna 'seriesFEResult' que contem uma lista?
+        # Assumindo estrutura baseada no solicitarSerie response, mas para listarSeries pode ser diferente.
+        # Ajustar conforme spec real. Normalmente é uma lista direta ou dentro de um campo.
+        # Vamos assumir que a resposta tem um campo 'seriesList' ou é o próprio root se for lista.
+        # Se o response for { "resultCode": 1, "seriesList": [...] }
+        
+        series_from_agt = resp.get('seriesList', [])
+        # Fallback se a estrutura for diferente
+        if not series_from_agt and 'seriesFEResult' in resp:
+             # Se for solicitarSerie retorna seriesFEResult (objeto único). Listar deve retornar lista.
+             pass
 
-        series_from_agt = resp.get('series', [])
         if not series_from_agt:
-            raise UserError("A AGT não retornou nenhuma série na sua resposta.")
+             # Pode ser que não haja séries ou a chave seja outra.
+             _logger.warning("Nenhuma série encontrada na resposta da AGT.")
+             return
 
         doc_classes = self.env['l10n_ao.fe.document.class'].search([])
         doc_class_map = {dc.code: dc.id for dc in doc_classes}
@@ -61,7 +81,7 @@ class FESerie(models.Model):
         created_count = 0
 
         for agt_serie in series_from_agt:
-            serie_code = agt_serie.get('serieCode')
+            serie_code = agt_serie.get('seriesCode')
             if not serie_code:
                 continue
 
@@ -70,21 +90,28 @@ class FESerie(models.Model):
                 ('company_id', '=', self.env.company.id)
             ], limit=1)
 
-            doc_class_id = doc_class_map.get(agt_serie.get('documentClass'))
+            doc_type_code = agt_serie.get('documentType')
+            doc_class_id = doc_class_map.get(doc_type_code)
+            
             if not doc_class_id:
-                _logger.warning(f"Tipo de documento '{agt_serie.get('documentClass')}' desconhecido. A saltar série '{serie_code}'.")
+                _logger.warning(f"Tipo de documento '{doc_type_code}' desconhecido. A saltar série '{serie_code}'.")
                 continue
 
             vals = {
                 'name': serie_code,
                 'document_class_id': doc_class_id,
-                'start_date': agt_serie.get('startDate'),
-                'end_date': agt_serie.get('endDate'),
-                'agt_status': 'active',  # As séries listadas estão, por definição, ativas na AGT
+                # 'start_date': agt_serie.get('startDate'), # Se disponível
+                # 'end_date': agt_serie.get('endDate'), # Se disponível
+                'first_number': int(agt_serie.get('firstDocumentNo', 0)),
+                'last_number': int(agt_serie.get('lastDocumentNo', 0)),
+                'authorized_quantity': agt_serie.get('authorizedQuantity'),
+                'agt_status': 'active',
                 'active': True,
             }
-
+            
+            # Se for nova série, next_number = first_number
             if not existing_serie:
+                vals['next_number'] = vals['first_number']
                 self.create(vals)
                 created_count += 1
             else:

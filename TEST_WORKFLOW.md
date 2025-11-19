@@ -31,20 +31,37 @@ Antes de enviar faturas, é necessário configurar os parâmetros de autenticaç
 
 **Nota:** O ficheiro `.pem` deve ser legível pelo utilizador que executa o serviço Odoo.
 
-## 3. Cenário de Teste: Envio de Fatura
+## 3. Cenário de Teste: Gestão de Séries e Envio
 
-Siga estes passos para validar o fluxo completo:
+Este fluxo valida desde a solicitação da série até ao envio da fatura.
 
+### 3.1. Solicitar Nova Série à AGT
+1.  Vá a **Faturação > Configuração > Séries FE AGT**.
+2.  Clique em **"Solicitar Série AGT"** (botão ou menu de ação, se disponível) ou crie um registo manualmente e procure o botão de solicitação.
+    *   *Nota: Se o botão não estiver visível diretamente, verifique se existe um menu "Solicitar Série" em Configuração ou use o Wizard diretamente.*
+    *   **Melhor Opção:** Vá a **Faturação > Configuração > Solicitar Série AGT** (se o menu foi criado) ou procure a ação no menu técnico.
+3.  Preencha o Wizard:
+    *   **Tipo de Documento:** Fatura (FT)
+    *   **Número Inicial:** 1
+    *   **Número Final:** 100 (ou conforme necessidade)
+    *   **Data Início:** Hoje
+4.  Clique em **"Solicitar"**.
+5.  **Resultado Esperado:**
+    *   Mensagem de sucesso: "Série solicitada e criada com sucesso!".
+    *   Uma nova série é criada em `l10n_ao.fe.serie`.
+    *   Uma nova sequência (`ir.sequence`) é criada no Odoo com o prefixo da série (ex: `FT2025.../`).
+
+### 3.2. Criar e Enviar Fatura
 1.  **Criar Fatura:**
     *   Vá a **Faturação > Clientes > Faturas**.
     *   Crie uma nova fatura.
-    *   Selecione um cliente (certifique-se que tem NIF/Tax ID válido, ex: `999999999`).
-    *   Adicione linhas de fatura com produtos.
-    *   **Confirme** a fatura (Estado: Lançado).
-
+    *   **Importante:** No campo "Diário" ou "Série", certifique-se que a fatura vai usar a sequência criada no passo anterior.
+        *   *Dica:* Pode ser necessário associar a nova sequência ao Diário de Vendas ou selecionar a série manualmente no campo "Série de FE" (se editável).
+    *   Confirme a fatura.
+    *   Verifique se o número da fatura (`name`) segue o formato `<SeriesCode>/<Num>` (ex: `FT2025.../1`).
 2.  **Enviar para a AGT:**
     *   No cabeçalho da fatura, clique no botão vermelho **"Enviar FE AGT"**.
-    *   O sistema irá gerar o payload, assinar e enviar.
+    *   O sistema irá gerar o payload (agora incluindo o `seriesCode`), assinar e enviar.
     *   Observe o campo **"Estado FE"** (Badge) mudar de "Não Enviado" para "Em Processamento" ou "Enviado".
     *   Verifique o chatter (lado direito) para ver a mensagem de sucesso com o `Request ID`.
 

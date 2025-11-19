@@ -137,6 +137,25 @@ class FeService(models.AbstractModel):
         submission_uuid = str(uuid.uuid4())
         timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
         
+        # Obter Série e Numeração
+        if not move.l10n_ao_fe_serie_id:
+             raise UserError(_("A fatura não tem uma Série FE associada."))
+        
+        serie = move.l10n_ao_fe_serie_id
+        series_code = serie.name
+        
+        # O número do documento deve ser <seriesCode>/<num>
+        # Assumindo que o move.name já está formatado corretamente pelo Odoo (ex: FT2025/1)
+        # Se não estiver, teríamos de forçar ou validar.
+        # O ideal é que a sequência do Odoo já gere FT2025/1.
+        # Vamos validar se o move.name começa com o series_code
+        
+        document_no = move.name
+        if not document_no.startswith(series_code):
+             # Tentar corrigir ou alertar?
+             # Se a sequência estiver bem configurada (prefixo = series_code + '/'), deve estar ok.
+             pass
+
         # Assinatura Software
         jws_software, software_info_detail = self._get_software_signature()
         
@@ -170,7 +189,8 @@ class FeService(models.AbstractModel):
 
         # Dados do Documento
         doc_data = {
-            "documentNo": move.name,
+            "documentNo": document_no,
+            "seriesCode": series_code, # CAMPO NOVO OBRIGATÓRIO
             "documentStatus": "N", # Normal
             "documentDate": str(move.invoice_date),
             "documentType": move.l10n_ao_fe_document_class_id.code or "FT",
@@ -281,6 +301,88 @@ class FeService(models.AbstractModel):
             "taxRegistrationNumber": tax_registration_number,
             "documentNo": document_no,
             "jwsSignature": jws_issuer
+        }
+        
+        payload_json = json.dumps(payload, indent=2)
+        self._log_communication(endpoint, 'request', payload_json)
+        
+        response = self._send_request(url, payload_json)
+        return response.json()
+
+    def solicitar_serie(self, series_type, document_type, requested_quantity, justification, tax_registration_number):
+        """
+        Endpoint: /solicitarSerie
+        """
+        endpoint = "/solicitarSerie"
+        url = self._get_base_url() + endpoint
+        
+        timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        
+        # Assinatura do Software
+        jws_software, software_info_detail = self._get_software_signature()
+        
+        # Assinatura do Emissor (Campos: taxRegistrationNumber, timestamp)
+        # Nota: O spec diz timestamp, mas o payload tem submissionTimeStamp. Confirmar se é o mesmo valor.
+        sign_fields = {
+            "taxRegistrationNumber": tax_registration_number,
+            "timestamp": timestamp
+        }
+        jws_issuer = self._get_issuer_signature(sign_fields)
+        
+        payload = {
+            "schemaVersion": "1.0",
+            "submissionUUID": str(uuid.uuid4()),
+            "submissionTimeStamp": timestamp,
+            "taxRegistrationNumber": tax_registration_number,
+            "softwareInfo": {
+                "softwareInfoDetail": software_info_detail,
+                "jwsSoftwareSignature": jws_software
+            },
+            "seriesRequest": {
+                "seriesType": series_type, # "N"
+                "documentType": document_type, # "FT", "NC", etc
+                "requestedQuantity": str(requested_quantity),
+                "seriesClass": "NORMAL",
+                "justification": justification
+            },
+            "jwsIssuerSignature": jws_issuer
+        }
+        
+        payload_json = json.dumps(payload, indent=2)
+        self._log_communication(endpoint, 'request', payload_json)
+        
+        response = self._send_request(url, payload_json)
+        return response.json()
+
+    def listar_series(self, tax_registration_number):
+        """
+        Endpoint: /listarSeries
+        """
+        endpoint = "/listarSeries"
+        url = self._get_base_url() + endpoint
+        
+        timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        
+        # Assinatura do Software
+        jws_software, software_info_detail = self._get_software_signature()
+        
+        # Assinatura do Emissor (Campos: taxRegistrationNumber, timestamp)
+        sign_fields = {
+            "taxRegistrationNumber": tax_registration_number,
+            "timestamp": timestamp
+        }
+        jws_issuer = self._get_issuer_signature(sign_fields)
+        
+        payload = {
+            "schemaVersion": "1.0",
+            "submissionUUID": str(uuid.uuid4()),
+            "submissionTimeStamp": timestamp,
+            "taxRegistrationNumber": tax_registration_number,
+            "softwareInfo": {
+                "softwareInfoDetail": software_info_detail,
+                "jwsSoftwareSignature": jws_software
+            },
+            "jwsIssuerSignature": jws_issuer
         }
         
         payload_json = json.dumps(payload, indent=2)

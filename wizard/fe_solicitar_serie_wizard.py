@@ -29,7 +29,7 @@ class FeSolicitarSerieWizard(models.TransientModel):
                 "N", # seriesType Normal
                 self.document_class_id.code,
                 qty,
-                "Utilização para emissão de facturas no sistema", # Justificação padrão
+                "Utilizacao para emissao de facturas no sistema", # Justificação padrão
                 self.env.company.vat
             )
             

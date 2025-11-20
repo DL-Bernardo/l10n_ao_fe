@@ -317,12 +317,12 @@ class FeService(models.AbstractModel):
         url = self._get_base_url() + endpoint
         
         timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        current_year = str(datetime.datetime.now().year)
         
         # Assinatura do Software
         jws_software, software_info_detail = self._get_software_signature()
         
         # Assinatura do Emissor (Campos: taxRegistrationNumber, timestamp)
-        # Nota: O spec diz timestamp, mas o payload tem submissionTimeStamp. Confirmar se é o mesmo valor.
         sign_fields = {
             "taxRegistrationNumber": tax_registration_number,
             "timestamp": timestamp
@@ -338,17 +338,22 @@ class FeService(models.AbstractModel):
                 "softwareInfoDetail": software_info_detail,
                 "jwsSoftwareSignature": jws_software
             },
-            "seriesRequest": {
-                "seriesType": series_type, # "N"
-                "documentType": document_type, # "FT", "NC", etc
-                "requestedQuantity": str(requested_quantity),
-                "seriesClass": "NORMAL",
-                "justification": justification
-            },
+            "seriesType": series_type, # "N"
+            "documentType": document_type, # "FT", "NC", etc
+            "seriesYear": current_year, # OBRIGATÓRIO
+            "establishmentNumber": "0000", # OBRIGATÓRIO (Assumindo sede)
+            "seriesContingencyIndicator": "N", # OBRIGATÓRIO (N = Normal, C = Contingência)
+            "requestedQuantity": str(requested_quantity),
+            "seriesClass": "NORMAL",
+            "justification": justification,
             "jwsIssuerSignature": jws_issuer
         }
         
         payload_json = json.dumps(payload, indent=2)
+        
+        # DEBUG: Imprimir payload exato para verificar campos
+        _logger.info("SOLICITAR SERIE PAYLOAD: %s", payload_json)
+        
         self._log_communication(endpoint, 'request', payload_json)
         
         response = self._send_request(url, payload_json)

@@ -4,3 +4,4 @@ access_l10n_ao_fe_document_class,l10n_ao.fe.document_class,model_l10n_ao_fe_docu
 access_l10n_ao_fe_error_code,l10n_ao.fe.error_code,model_l10n_ao_fe_error_code,base.group_user,1,0,0,0
 access_l10n_ao_fe_solicitar_serie_wizard,l10n_ao.fe.solicitar.serie.wizard,model_l10n_ao_fe_solicitar_serie_wizard,base.group_user,1,1,1,1
 access_l10n_ao_fe_queue,l10n_ao.fe.queue,model_l10n_ao_fe_queue,base.group_user,1,1,1,1
+access_l10n_ao_fe_log,l10n_ao.fe.log,model_l10n_ao_fe_log,base.group_user,1,1,1,1

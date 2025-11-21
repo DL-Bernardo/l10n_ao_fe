@@ -127,11 +127,15 @@ class AccountMoveInherit(models.Model):
     def open_payload_wizard(self):
         """Abre o wizard para mostrar o payload JSON."""
         self.ensure_one()
-        # Se já tiver payload gerado, mostra esse. Se não, gera um preview.
-        if self.fe_payload_json:
-            payload = self.fe_payload_json
+        # Regenerar payload se não estiver validado, para refletir correções de código
+        if self.fe_status != 'success':
+            try:
+                # Chama o serviço para gerar o JSON atualizado
+                payload = self.env['l10n_ao.fe.service'].registar_factura(self, preview=True)
+            except Exception as e:
+                payload = f"Erro ao gerar preview: {str(e)}"
         else:
-            payload = "O payload é gerado no momento do envio. Clique em 'Enviar FE AGT' para gerar."
+            payload = self.fe_payload_json or "Payload não disponível."
 
         return {
             'name': _('Payload JSON'),

@@ -271,39 +271,71 @@ class FeService(models.AbstractModel):
         series_code = serie.name
         document_no = payment.name
         
-        amount = payment.amount
-        totals = {
-            "taxPayable": "0.00",
-            "netTotal": f"{amount:.2f}",
-            "grossTotal": f"{amount:.2f}"
-        }
-        
+        # Nova lógica de cálculo proporcional para Recibos
         invoices = payment.reconciled_invoice_ids
-        source_documents = []
         
-        if not invoices:
-             originating_on = payment.ref or "Desconhecido"
-             invoice_date = str(payment.date)
-             source_documents.append({
-                "lineNo": "1",
-                "sourceDocumentID": {
-                    "originatingON": originating_on,
-                    "documentDate": invoice_date
-                },
-                "creditAmount": f"{amount:.2f}"
-             })
+        total_tax_payable = 0.0
+        total_net = 0.0
+        total_gross = payment.amount
+        
+        source_documents = []
+        remaining_amount = payment.amount
+        
+        if invoices:
+            for inv in invoices:
+                if remaining_amount <= 0:
+                    break
+                
+                # Tentar encontrar o valor reconciliado para esta fatura
+                reconciled_amount = 0.0
+                for partial in payment.matched_debit_ids:
+                    if partial.debit_move_id.move_id == inv:
+                        reconciled_amount += partial.amount
+                for partial in payment.matched_credit_ids:
+                    if partial.credit_move_id.move_id == inv:
+                        reconciled_amount += partial.amount
+                
+                if reconciled_amount == 0:
+                     reconciled_amount = min(remaining_amount, inv.amount_total)
+
+                # Calcular proporção Base/Imposto
+                if inv.amount_total > 0:
+                    ratio = reconciled_amount / inv.amount_total
+                    inv_net_paid = inv.amount_untaxed * ratio
+                    inv_tax_paid = inv.amount_tax * ratio
+                else:
+                    inv_net_paid = reconciled_amount
+                    inv_tax_paid = 0.0
+                
+                source_documents.append({
+                    "lineNo": str(len(source_documents) + 1),
+                    "sourceDocumentID": {
+                        "originatingON": inv.name,
+                        "documentDate": str(inv.invoice_date)
+                    },
+                    "creditAmount": f"{inv_net_paid:.2f}" # Valor SEM imposto
+                })
+                
+                total_net += inv_net_paid
+                total_tax_payable += inv_tax_paid
+                remaining_amount -= reconciled_amount
         else:
-            inv = invoices[0]
-            originating_on = inv.name or "N/A"
-            invoice_date = str(inv.invoice_date)
+            # Sem fatura (adiantamento)
             source_documents.append({
                 "lineNo": "1",
                 "sourceDocumentID": {
-                    "originatingON": originating_on,
-                    "documentDate": invoice_date
+                    "originatingON": payment.ref or "Adiantamento",
+                    "documentDate": str(payment.date)
                 },
-                "creditAmount": f"{amount:.2f}"
-             })
+                "creditAmount": f"{payment.amount:.2f}"
+            })
+            total_net = payment.amount
+
+        totals = {
+            "taxPayable": f"{total_tax_payable:.2f}",
+            "netTotal": f"{total_net:.2f}",
+            "grossTotal": f"{total_gross:.2f}"
+        }
 
         payment_receipt = {
             "sourceDocuments": source_documents

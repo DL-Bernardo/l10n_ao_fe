@@ -39,7 +39,7 @@
 
         <record id="l10n_ao_fe.software_validation_number" model="ir.config_parameter">
             <field name="key">l10n_ao_fe.software_validation_number</field>
-            <field name="value">0000/AGT/2025</field>
+            <field name="value">FE/85/AGT/2025</field>
         </record>
     </data>
 </odoo>

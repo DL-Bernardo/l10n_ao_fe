@@ -78,7 +78,7 @@ class FeService(models.AbstractModel):
         payload = {
             "productId": self._get_conf("product_id", "DIGITALUB-FE"),
             "productVersion": self._get_conf("product_version", "1.0.0"),
-            "softwareValidationNumber": self._get_conf("software_validation_number", "0000/AGT/2025")
+            "softwareValidationNumber": self._get_conf("software_validation_number", "FE/85/AGT/2025")
         }
         return self._sign_payload(payload, key_type='software'), payload
 
@@ -288,12 +288,17 @@ class FeService(models.AbstractModel):
                 
                 # Tentar encontrar o valor reconciliado para esta fatura
                 reconciled_amount = 0.0
-                for partial in payment.matched_debit_ids:
-                    if partial.debit_move_id.move_id == inv:
-                        reconciled_amount += partial.amount
-                for partial in payment.matched_credit_ids:
-                    if partial.credit_move_id.move_id == inv:
-                        reconciled_amount += partial.amount
+                # Em Odoo 14+, as reconciliações estão nas linhas do movimento
+                # Procurar nas linhas do pagamento que são de conta a receber/pagar
+                payment_lines = payment.move_id.line_ids.filtered(lambda l: l.account_id.account_type in ('asset_receivable', 'liability_payable'))
+                
+                for line in payment_lines:
+                    for partial in line.matched_debit_ids:
+                        if partial.debit_move_id.move_id == inv:
+                            reconciled_amount += partial.amount
+                    for partial in line.matched_credit_ids:
+                        if partial.credit_move_id.move_id == inv:
+                            reconciled_amount += partial.amount
                 
                 if reconciled_amount == 0:
                      reconciled_amount = min(remaining_amount, inv.amount_total)

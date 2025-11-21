@@ -173,7 +173,7 @@ class FeService(models.AbstractModel):
             if move.move_type == 'out_refund':
                 origin_move = move.reversed_entry_id
                 origin_ref = origin_move.name if origin_move else (move.invoice_origin or "Desconhecido")
-                line_data["reference"] = {
+                line_data["referenceInfo"] = {
                     "reference": origin_ref,
                     "reason": move.ref or "Devolução / Estorno"
                 }

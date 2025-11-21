@@ -148,7 +148,7 @@ class FeService(models.AbstractModel):
                 "taxType": tax_type,
                 "taxCountryRegion": "AO",
                 "taxCode": tax_code,
-                "taxBase": f"{tax_base:.2f}",
+                # "taxBase": f"{tax_base:.2f}", # Removido: conflita com debit/credit em faturas normais
                 "taxPercentage": f"{tax_percentage:.2f}",
                 "taxContribution": f"{tax_amount:.2f}"
             }
@@ -163,8 +163,9 @@ class FeService(models.AbstractModel):
                 "unitOfMeasure": line.product_uom_id.name or "Un",
                 "unitPrice": f"{line.price_unit:.2f}",
                 "unitPriceBase": f"{line.price_unit:.2f}",
-                "debitAmount": f"{line.price_subtotal:.2f}" if move.move_type in ('out_invoice', 'in_refund') else "0.00",
-                "creditAmount": f"{line.price_subtotal:.2f}" if move.move_type in ('out_refund', 'in_invoice') else "0.00",
+                # Invertido: Faturas (out_invoice) = CreditAmount (Proveito), NC (out_refund) = DebitAmount
+                "debitAmount": f"{line.price_subtotal:.2f}" if move.move_type in ('out_refund', 'in_invoice') else "0.00",
+                "creditAmount": f"{line.price_subtotal:.2f}" if move.move_type in ('out_invoice', 'in_refund') else "0.00",
                 "taxes": [tax_dict],
                 "settlementAmount": "0.00"
             }

@@ -173,9 +173,21 @@ class FeService(models.AbstractModel):
             if move.move_type == 'out_refund':
                 origin_move = move.reversed_entry_id
                 origin_ref = origin_move.name if origin_move else (move.invoice_origin or "Desconhecido")
+                
+                ref_line_no = "1"
+                if origin_move:
+                    # Tentar encontrar a linha correspondente na fatura original
+                    # Filtrar linhas de produto da fatura original para manter a contagem correta
+                    orig_lines = origin_move.invoice_line_ids.filtered(lambda l: l.display_type not in ('line_section', 'line_note'))
+                    for idx, orig_line in enumerate(orig_lines, 1):
+                        if orig_line.product_id == line.product_id:
+                            ref_line_no = str(idx)
+                            break
+
                 line_data["referenceInfo"] = {
                     "reference": origin_ref,
-                    "reason": move.ref or "Devolução / Estorno"
+                    "reason": move.ref or "Devolução / Estorno",
+                    "referenceItemLineNo": ref_line_no
                 }
                 
             lines.append(line_data)

@@ -52,6 +52,16 @@ class FeSolicitarSerieWizard(models.TransientModel):
                     'company_id': self.env.company.id,
                 })
                 
+                # Cap values to fit in PostgreSQL Integer (2147483647)
+                MAX_INT = 2147483647
+                last_no = int(series_result.get('lastDocumentNo', 0))
+                auth_qty = int(series_result.get('authorizedQuantity', 0))
+                
+                if last_no > MAX_INT:
+                    last_no = MAX_INT
+                if auth_qty > MAX_INT:
+                    auth_qty = MAX_INT
+
                 # Criar registo da série
                 self.env['l10n_ao.fe.serie'].create({
                     'name': series_code,
@@ -60,9 +70,9 @@ class FeSolicitarSerieWizard(models.TransientModel):
                     'start_date': self.start_date,
                     'end_date': self.end_date,
                     'first_number': int(series_result.get('firstDocumentNo', 0)),
-                    'last_number': int(series_result.get('lastDocumentNo', 0)),
+                    'last_number': last_no,
                     'next_number': int(series_result.get('firstDocumentNo', 0)),
-                    'authorized_quantity': series_result.get('authorizedQuantity'),
+                    'authorized_quantity': auth_qty,
                     'agt_status': 'active',
                     'active': True
                 })

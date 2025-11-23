@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 from odoo import models, fields, api, _
 import json
+import logging
+
+_logger = logging.getLogger(__name__)
 
 class FeGetStateWizard(models.TransientModel):
     _name = "l10n_ao.fe.get.state.wizard"
@@ -28,27 +31,69 @@ class FeGetStateWizard(models.TransientModel):
                 status = doc_info.get('documentStatus')
                 error_list = doc_info.get('errorList', [])
                 
+                _logger.info(f"FE AGT: Processando estado para {doc_no} - Status: {status}")
+                
                 # Procurar a fatura pelo número
                 moves = self.env['account.move'].search([('name', '=', doc_no)])
                 
-                for move in moves:
-                    new_status = move.fe_status
-                    if status == 'V':
-                        new_status = 'validated'
-                        # Gerar QR Code se validado
-                        if hasattr(move, 'generate_qr_code'):
-                            move.generate_qr_code()
-                    elif status in ('I', 'E'):
-                        new_status = 'error'
-                        move.fe_error_list = str(error_list)
-                    
-                    move.write({
-                        'fe_status': new_status,
-                        'fe_last_response': self.response_json
-                    })
-                    
-                    # Logar no chatter
-                    move.message_post(body=_("Estado atualizado via Obter Estado: %s", new_status))
+                if moves:
+                    _logger.info(f"FE AGT: Encontradas {len(moves)} faturas (moves) para {doc_no}")
+                    for move in moves:
+                        new_status = move.fe_status
+                        if status == 'V':
+                            new_status = 'validated'
+                            # Gerar QR Code se validado
+                            if hasattr(move, 'generate_qr_code'):
+                                move.generate_qr_code()
+                        elif status in ('I', 'E'):
+                            new_status = 'error'
+                            move.fe_error_list = str(error_list)
+                        
+                        _logger.info(f"FE AGT: Atualizando move {move.id} para {new_status}")
+                        move.write({
+                            'fe_status': new_status,
+                            'fe_last_response': self.response_json
+                        })
+                        
+                        # Logar no chatter
+                        move.message_post(body=_("Estado atualizado via Obter Estado: %s", new_status))
+                        
+                        # Verificar se existe um pagamento associado a este movimento e atualizar também
+                        payment = self.env['account.payment'].search([('move_id', '=', move.id)], limit=1)
+                        if payment:
+                            _logger.info(f"FE AGT: Atualizando pagamento relacionado {payment.id} para {new_status}")
+                            vals_pay = {'fe_status': new_status}
+                            if hasattr(payment, 'fe_last_response'):
+                                vals_pay['fe_last_response'] = self.response_json
+                            payment.write(vals_pay)
+                            
+                            if hasattr(payment, 'message_post'):
+                                payment.message_post(body=_("Estado atualizado via Obter Estado (via movimento): %s", new_status))
+                else:
+                    _logger.info(f"FE AGT: Nenhuma fatura encontrada para {doc_no}. Procurando pagamentos...")
+                    # Se não encontrar faturas, procurar pagamentos (Recibos)
+                    payments = self.env['account.payment'].search([('name', '=', doc_no)])
+                    _logger.info(f"FE AGT: Encontrados {len(payments)} pagamentos para {doc_no}")
+
+                    for payment in payments:
+                        new_status = payment.fe_status
+                        if status == 'V':
+                            new_status = 'validated'
+                        elif status in ('I', 'E'):
+                            new_status = 'error'
+                            payment.fe_error_list = str(error_list)
+                        
+                        _logger.info(f"FE AGT: Atualizando payment {payment.id} para {new_status}")
+                        
+                        # Nota: account.payment pode não ter fe_last_response
+                        vals = {'fe_status': new_status}
+                        if hasattr(payment, 'fe_last_response'):
+                             vals['fe_last_response'] = self.response_json
+                             
+                        payment.write(vals)
+                        
+                        if hasattr(payment, 'message_post'):
+                             payment.message_post(body=_("Estado atualizado via Obter Estado: %s", new_status))
 
         return {
             'type': 'ir.actions.act_window',

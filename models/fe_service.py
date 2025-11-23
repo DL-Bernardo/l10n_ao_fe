@@ -452,16 +452,27 @@ class FeService(models.AbstractModel):
         endpoint = "/consultarFactura"
         url = self._get_base_url() + endpoint
         
+        timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        jws_software, software_info_detail = self._get_software_signature()
+        
+        # Campos para assinatura do emissor
+        # Baseado no padrão, deve incluir os identificadores principais
         sign_fields = {
             "taxRegistrationNumber": tax_registration_number,
-            "documentNo": document_no
+            "invoiceNo": document_no
         }
         jws_issuer = self._get_issuer_signature(sign_fields)
         
         payload = {
             "schemaVersion": "1.0",
+            "submissionUUID": str(uuid.uuid4()),
             "taxRegistrationNumber": tax_registration_number,
-            "documentNo": document_no,
+            "submissionTimeStamp": timestamp,
+            "invoiceNo": document_no,
+            "softwareInfo": {
+                "softwareInfoDetail": software_info_detail,
+                "jwsSoftwareSignature": jws_software
+            },
             "jwsSignature": jws_issuer
         }
         

@@ -13,11 +13,10 @@
                     </div>
                     <div class="col-8" style="font-size: 10px; word-wrap: break-word;">
                         <div t-if="o.fe_document_hash">
-                            <strong>Hash:</strong> <span t-field="o.fe_document_hash"/>
+                            <!-- Mostrar apenas os 4 últimos caracteres do Hash/Assinatura -->
+                            <strong>Hash:</strong> <span t-esc="o.fe_document_hash[-4:] if o.fe_document_hash else ''"/>
                         </div>
-                        <div t-if="o.fe_jws_software_signature" class="mt-1">
-                            <strong>Assinatura Software:</strong> <span t-field="o.fe_jws_software_signature"/>
-                        </div>
+                        <!-- Assinatura de Software removida para limpar layout -->
                     </div>
                 </div>
             </t>

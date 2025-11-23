@@ -235,7 +235,7 @@ class FeService(models.AbstractModel):
             'fe_payload_json': payload_json,
             'fe_jws_software_signature': jws_software,
             'fe_jws_document_signature': jws_doc,
-            'fe_document_hash': jws_doc,
+            'fe_document_hash': jws_doc[-4:] if jws_doc else False,
         }
         if not preview:
             vals['fe_sent_datetime'] = fields.Datetime.now()

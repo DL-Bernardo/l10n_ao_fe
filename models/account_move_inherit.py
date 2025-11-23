@@ -99,6 +99,7 @@ class AccountMoveInherit(models.Model):
                 final_status = 'sent'
                 if doc_status == 'V':
                     final_status = 'validated'
+                    move.generate_qr_code()
                 elif doc_status == 'I' or error_list:
                     final_status = 'error'
                     error_msgs = "\n".join([f"({e.get('idError')}) {e.get('descriptionError')}" for e in error_list])
@@ -234,7 +235,11 @@ class AccountMoveInherit(models.Model):
                     _logger.warning("Não foi possível adicionar o logotipo ao QR Code: %s", e)
 
             # Redimensionar para 350x350 px
-            qr_img = qr_img.resize((350, 350), Image.Resampling.LANCZOS)
+            try:
+                resample = Image.Resampling.LANCZOS
+            except AttributeError:
+                resample = Image.LANCZOS
+            qr_img = qr_img.resize((350, 350), resample)
 
             # Converter imagem para base64 e guardar na fatura
             buf = BytesIO()

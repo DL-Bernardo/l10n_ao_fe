@@ -170,14 +170,18 @@ class FeService(models.AbstractModel):
                 "settlementAmount": "0.00"
             }
             
-            if move.move_type == 'out_refund':
+            # Bloco de Referência para Notas de Crédito (NC) e Notas de Débito (ND)
+            doc_type = move.l10n_ao_fe_serie_id.document_class_id.code or "FT"
+            if move.move_type == 'out_refund' or doc_type == 'ND':
                 origin_move = move.reversed_entry_id
+                # Se for ND, o Odoo pode não preencher reversed_entry_id, tentamos debit_origin_id (se existir em versões recentes) ou refs
+                if not origin_move and hasattr(move, 'debit_origin_id'):
+                    origin_move = move.debit_origin_id
+                
                 origin_ref = origin_move.name if origin_move else (move.invoice_origin or "Desconhecido")
                 
                 ref_line_no = "1"
                 if origin_move:
-                    # Tentar encontrar a linha correspondente na fatura original
-                    # Filtrar linhas de produto da fatura original para manter a contagem correta
                     orig_lines = origin_move.invoice_line_ids.filtered(lambda l: l.display_type not in ('line_section', 'line_note'))
                     for idx, orig_line in enumerate(orig_lines, 1):
                         if orig_line.product_id == line.product_id:
@@ -186,7 +190,7 @@ class FeService(models.AbstractModel):
 
                 line_data["referenceInfo"] = {
                     "reference": origin_ref,
-                    "reason": move.ref or "Devolução / Estorno",
+                    "reason": move.ref or ("Retificação / Débito" if doc_type == 'ND' else "Devolução / Estorno"),
                     "referenceItemLineNo": ref_line_no
                 }
                 

@@ -369,13 +369,13 @@ class FeService(models.AbstractModel):
         
         fields_to_sign = {
             "documentNo": doc_data.get("documentNo"),
-            "documentDate": doc_data.get("documentDate"),
+            "taxRegistrationNumber": payment.company_id.vat,
             "documentType": doc_data.get("documentType"),
-            "companyName": doc_data.get("companyName"),
+            "documentDate": doc_data.get("documentDate"),
             "customerTaxID": doc_data.get("customerTaxID"),
             "customerCountry": doc_data.get("customerCountry"),
+            "companyName": doc_data.get("companyName"),
             "documentTotals": doc_data.get("documentTotals"),
-            "taxRegistrationNumber": payment.company_id.vat, 
         }
         jws_doc = self._sign_payload(fields_to_sign, key_type='issuer')
         doc_data["jwsDocumentSignature"] = jws_doc
@@ -500,7 +500,10 @@ class FeService(models.AbstractModel):
         
         sign_fields = {
             "taxRegistrationNumber": tax_registration_number,
-            "timestamp": timestamp
+            "seriesYear": int(current_year),
+            "documentType": document_type,
+            "establishmentNumber": "0000",
+            "seriesContingencyIndicator": "N"
         }
         jws_issuer = self._get_issuer_signature(sign_fields)
         
@@ -521,7 +524,7 @@ class FeService(models.AbstractModel):
             "requestedQuantity": int(requested_quantity),
             "seriesClass": "NORMAL",
             "justification": justification,
-            "jwsIssuerSignature": jws_issuer
+            "jwsSignature": jws_issuer
         }
         
         payload_json = json.dumps(payload, indent=2)
@@ -540,8 +543,7 @@ class FeService(models.AbstractModel):
         jws_software, software_info_detail = self._get_software_signature()
         
         sign_fields = {
-            "taxRegistrationNumber": tax_registration_number,
-            "timestamp": timestamp
+            "taxRegistrationNumber": tax_registration_number
         }
         jws_issuer = self._get_issuer_signature(sign_fields)
         
@@ -554,7 +556,7 @@ class FeService(models.AbstractModel):
                 "softwareInfoDetail": software_info_detail,
                 "jwsSoftwareSignature": jws_software
             },
-            "jwsIssuerSignature": jws_issuer
+            "jwsSignature": jws_issuer
         }
         
         payload_json = json.dumps(payload, indent=2)

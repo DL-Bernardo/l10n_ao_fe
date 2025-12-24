@@ -53,4 +53,19 @@
             </xpath>
         </field>
     </record>
+    <record id="view_invoice_tree_inherit_fe_v5" model="ir.ui.view">
+        <field name="name">account.invoice.tree.inherit.fe.v5</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="account.view_invoice_tree"/>
+        <field name="priority">1</field>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='state']" position="after">
+                <field name="fe_status" string="Estado FE" widget="badge" 
+                       decoration-success="fe_status == 'validated'" 
+                       decoration-info="fe_status in ('sent', 'processing')" 
+                       decoration-danger="fe_status == 'error'"
+                       invisible="0"/>
+            </xpath>
+        </field>
+    </record>
 </odoo>

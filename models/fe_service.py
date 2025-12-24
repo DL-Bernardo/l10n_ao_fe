@@ -72,9 +72,12 @@ class FeService(models.AbstractModel):
         else:
             private_key = self._get_private_key()
         try:
+            # Header conforme exemplo da especificação AGT - Ordem e Conteúdo Cruciais
+            header = {"typ": "JOSE", "alg": "RS256"}
             # Garantir JSON canónico (sem espaços) para a assinatura
             payload_json = json.dumps(payload_dict, separators=(',', ':'), ensure_ascii=False)
-            return jws.sign(payload_json.encode('utf-8'), private_key, algorithm='RS256')
+            _logger.debug("JWS payload [%s]: %s", key_type, payload_json)
+            return jws.sign(payload_json.encode('utf-8'), private_key, algorithm='RS256', headers=header)
         except Exception as e:
             raise UserError(_("Erro ao gerar assinatura JWS (%s): %s", key_type, e))
 
@@ -91,15 +94,16 @@ class FeService(models.AbstractModel):
         return self._sign_payload(payload, key_type='software'), payload
 
     def _get_document_signature(self, move, doc_data):
+        # Ordem rigorosa conforme Payload assinatura Registar Factura da especificação
         fields_to_sign = {
             "documentNo": doc_data.get("documentNo"),
-            "documentDate": doc_data.get("documentDate"),
+            "taxRegistrationNumber": move.company_id.vat,
             "documentType": doc_data.get("documentType"),
-            "companyName": doc_data.get("companyName"),
+            "documentDate": doc_data.get("documentDate"),
             "customerTaxID": doc_data.get("customerTaxID"),
             "customerCountry": doc_data.get("customerCountry"),
+            "companyName": doc_data.get("companyName"),
             "documentTotals": doc_data.get("documentTotals"),
-            "taxRegistrationNumber": move.company_id.vat, 
         }
         return self._sign_payload(fields_to_sign, key_type='issuer')
 

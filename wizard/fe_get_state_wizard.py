@@ -22,14 +22,35 @@ class FeGetStateWizard(models.TransientModel):
         
         # Formata a resposta
         self.response_json = json.dumps(response, indent=2, ensure_ascii=False)
+        _logger.info(f"FE AGT: Resposta recebida do Obter Estado: {self.response_json}")
         
         # Processar a resposta e atualizar faturas
-        doc_status_list = response.get('documentStatusList', [])
-        if doc_status_list:
+        
+        # Erros globais ou de requisição (que podem causar E08/E40)
+        request_errors = response.get('requestErrorList', [])
+        if isinstance(request_errors, list) and any(isinstance(e, dict) for e in request_errors):
+            error_msg = "\n".join([f"({e.get('idError')}) {e.get('descriptionError')}" for e in request_errors if isinstance(e, dict)])
+            _logger.error(f"FE AGT: Erros na requisição: {error_msg}")
+            # Se houver erro global e apenas um movimento no wizard, podemos logar o erro nele
+            # mas geralmente o wizard é genérico.
+
+        doc_status_list = response.get('documentStatusList')
+        if isinstance(doc_status_list, list):
             for doc_info in doc_status_list:
+                if not isinstance(doc_info, dict):
+                    continue
+
                 doc_no = doc_info.get('documentNo')
+                if not doc_no:
+                    continue
+
                 status = doc_info.get('documentStatus')
                 error_list = doc_info.get('errorList', [])
+                if not isinstance(error_list, list):
+                    error_list = []
+                
+                # Filtrar apenas erros que sejam dicionários
+                error_list = [e for e in error_list if isinstance(e, dict)]
                 
                 _logger.info(f"FE AGT: Processando estado para {doc_no} - Status: {status}")
                 

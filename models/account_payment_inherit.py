@@ -64,14 +64,20 @@ class AccountPaymentInherit(models.Model):
                 
                 # Se a AGT devolver erro na resposta imediata
                 error_list = response.get('errorList', [])
-                if error_list:
+                real_errors = [e for e in error_list if isinstance(e, dict) and (e.get('idError') or e.get('errorCode'))]
+                
+                if real_errors:
                     vals['fe_status'] = 'error'
-                    vals['fe_error_list'] = str(error_list)
+                    error_msgs = "\n".join([f"({e.get('idError', e.get('errorCode'))}) {e.get('descriptionError', e.get('errorDescription'))}" for e in real_errors])
+                    vals['fe_error_list'] = error_msgs or str(error_list)
                 
                 payment.write(vals)
                 
                 if hasattr(payment, 'message_post'):
-                    payment.message_post(body=_("Recibo enviado para a AGT. Request ID: %s", request_id))
+                    msg = _("Recibo enviado para a AGT. Request ID: %s", request_id)
+                    if vals['fe_status'] == 'error':
+                        msg = _("Erro no envio do recibo: %s", vals.get('fe_error_list'))
+                    payment.message_post(body=msg)
                 
             except Exception as e:
                 payment.write({

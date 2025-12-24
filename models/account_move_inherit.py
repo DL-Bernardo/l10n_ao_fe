@@ -96,13 +96,18 @@ class AccountMoveInherit(models.Model):
                 # If we get a requestID, it's usually 'sent' or 'processing' until validated.
                 
                 final_status = 'sent'
+                final_status = 'sent'
                 if doc_status == 'V':
                     final_status = 'validated'
                     move.generate_qr_code()
-                elif doc_status == 'I' or error_list:
+                
+                # Filtrar erros reais (ignorar strings vazias como [""])
+                real_errors = [e for e in error_list if isinstance(e, dict) and (e.get('idError') or e.get('errorCode'))]
+                
+                if doc_status == 'I' or real_errors:
                     final_status = 'error'
-                    error_msgs = "\n".join([f"({e.get('idError')}) {e.get('descriptionError')}" for e in error_list])
-                    move.fe_error_list = error_msgs
+                    error_msgs = "\n".join([f"({e.get('idError', e.get('errorCode'))}) {e.get('descriptionError', e.get('errorDescription'))}" for e in real_errors])
+                    move.fe_error_list = error_msgs or str(error_list)
                 
                 move.write({
                     'fe_request_id': request_id,

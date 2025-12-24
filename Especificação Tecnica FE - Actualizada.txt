@@ -1,0 +1,4651 @@
+1. Introdução
+
+
+A API de Faturação Eletrónica define o conjunto de interfaces, regras e padrões técnicos necessários para a comunicação automática de documentos fiscais entre os softwares de faturação certificados e a Administração Tributária. O objetivo é garantir a integridade, autenticidade e rastreabilidade dos documentos através de mecanismos como assinatura digital JWS e controle de séries.
+
+A arquitetura é suportada por um modelo de processamento assíncrono, permitindo validações baseadas em filas de processamento, com consulta posterior (polling) ou envio de notificações callback (Disponível nas próximas versões). Este documento descreve a visão geral da API, o fluxo de integração ponta a ponta, o modelo de comunicação e os principais conceitos técnicos necessários para implementação correta da solução.
+Propósito da API
+
+A API de Faturação Eletrónica tem como objetivo permitir que softwares de faturação comuniquem em tempo real (ou quase real) todos os documentos fiscais à Administração Tributária, garantindo:
+
+    Integridade e autenticidade por meio de assinatura digital JWS.
+
+    Validação automática e retorno do estado do documento (válido ou inválido).
+
+    Sincronização entre os sistemas internos do contribuinte e a base fiscal.
+
+    Auditoria e rastreabilidade completa (com requestID, timestamps e histórico de processamento).
+
+Arquitectura Geral da API
+
+A arquitetura da solução é baseada no modelo de comunicação assíncrona:
+
+Processamento Assíncrono
+
+    O contribuinte envia o documento JSON.
+
+    A API devolve requestID imediatamente, confirmando apenas receção.
+
+    O documento entra na fila de processamento.
+
+    O contribuinte deve consultar (polling) ou aguardar callback.
+
+Este modelo suporta:
+
+    volumes grandes
+
+    redução de latência no front-end
+
+    isolamento de falhas
+
+Mecanismos disponíveis:
+
+*Mecanismo 	               *Como funciona
+
+Polling				Cliente consulta a decisão final.
+	
+Callback (se ativado)		A API faz POST para o endpoint do contribuinte quando o documento for validado. (Disponível nas próximas versões)
+
+
+2. Autenticação & Autorização
+
+
+A API utiliza o mecanismo Basic Authentication para validar e autorizar o acesso dos produtores de software.
+O acesso é concedido através de um par de credenciais (username e password) emitido pela entidade gestora da Faturação Eletrónica.
+
+Estas credenciais devem ser enviadas em todas as chamadas aos serviços protegidos da API.
+Obtenção das Credenciais
+
+Para solicitar as credenciais de acesso, o produtor de software deve enviar um e-mail formal para:
+
+📧 produtores.dfe.dcrr.agt@minfin.gov.ao
+
+O pedido deve conter:
+
+    Nome da Empresa
+
+    NIF da Empresa
+
+Funcionamento do Basic Auth
+
+O Basic Auth consiste em enviar as credenciais codificadas em Base64 no cabeçalho HTTP:
+
+Authorization: Basic <Base64(username:password)>
+
+Exemplo de codificação:
+
+Se as credenciais forem:
+
+    Username: cliente123
+
+    Password: s3nh@F0rte!
+
+Concatenação antes do Base64: cliente123:s3nh@F0rte!
+
+Após Base64: Y2xpZW50ZTEyMzpzM25oQEYwcnRlIQ==
+Exemplo de Header HTTP Completo
+
+
+Requisição POST
+
+ POST /sigt/fe/v1/registarFactura HTTP/1.1
+ Host: https://sifphml.minfin.gov.ao
+ Authorization: Basic Y2xpZW50ZTEyMzpzM25oQEYwcnRlIQ==
+ Content-Type: application/json
+ Accept: application/json
+ Content-Length: 524
+
+Exemplo em cURL
+
+ curl -X POST "https://sifphml.minfin.gov.ao/sigt/fe/v1/registarFactura"
+ -u cliente123:"s3nh@F0rte!"
+ -H "Accept: application/json"
+
+Nota: O curl já faz o Base64 automaticamente quando usamos -u.
+Exemplo em JavaScript (Fetch API)
+
+const auth = btoa("cliente123:s3nh@F0rte!");
+
+ fetch("https://sifphml.minfin.gov.ao/sigt/fe/v1/registarFactura ",{
+
+    method: "POST",
+    headers:{
+        "Authorization": `Basic $\{auth}`,
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
+
+ }).then(res => res.json()).then(console.log);
+
+Exemplo em C# (HttpClient)
+
+ var client = new HttpClient();
+
+ var byteArray = Encoding.ASCII.GetBytes("cliente123:s3nh@F0rte!");
+
+ client.DefaultRequestHeaders.Authorization =
+    new AuthenticationHeaderValue("Basic",Convert.ToBase64String(byteArray));
+
+ var response = await client.GetAsync("https://sifphml.minfin.gov.ao/sigt/fe/v1/registarFactura");
+ var content = await response.Content.ReadAsStringAsync();
+
+
+
+3. Estrutura das Assinaturas Digitais (JWS)
+
+
+A API de Faturação Eletrónica utiliza JSON Web Signature (JWS) como mecanismo padrão para assinatura digital de:
+
+    Informações do software (jwsSoftwareSignature)
+
+    Documentos fiscais (jwsDocumentSignature)
+
+    Requisições feitas ao serviço (jwsSignature)
+
+O objetivo é garantir:
+
+    Integridade – os dados não foram alterados.
+
+    Autenticidade – o emissor é quem diz ser.
+
+    Não-repúdio – o emissor não pode negar a autoria.
+
+Cada assinatura utiliza a chave privada do contribuinte ou do produtor, dependendo do tipo de assinatura.
+Algoritmo Utilizado (RS256)
+
+Todas as assinaturas JWS utilizam o algoritmo:
+
+✔ RS256 – RSA com SHA-256
+
+Características:
+
+    Chave privada RSA a partir de 2048 bits (recomenda-se 4096).
+
+    Hash criptográfico SHA-256.
+
+    Cabeçalho JWS:
+
+ {
+    "alg": "RS256",
+    "typ": "JWT"
+ }
+
+Para garantir melhor consistência, recomendamos que o objeto a assinar deve ser transformado em JSON canônico antes da assinatura.
+
+Regras de JSON canônico:
+
+    Sem quebras de linha.
+
+    Sem espaços ou indentação.
+
+    Aspas duplas sempre obrigatórias.
+
+    Números sem formatação adicional.
+
+Exemplo de objeto:
+
+ {
+    "softwareName":"Nome",
+    "softwareVersion":"1.0",
+    "softwareValidationNo":"123"
+ }
+
+Geração da Assinatura (Resumo do Processo)
+
+Todas as assinaturas seguem este fluxo:
+
+    Criar um objeto JSON (canônico recomendado) contendo apenas os campos exigidos.
+
+    Montar o JWS Compact Serialization:
+
+    base64url(header) + "." + base64url(payload)
+
+    Assinar com RSA-SHA256 usando a chave privada.
+
+    Gerar o JWS final:
+
+    header.payload.signature
+
+Assinatura jwsSoftwareSignature
+
+Assina o objeto:
+
+ {
+   "softwareName": "Nome do Software",
+   "softwareVersion": "1.0.0",
+   "softwareValidationNo": "FE/123456789/AGT/2025"
+ }
+
+O payload é o objeto inteiro, e não concatenação de campos.
+Assinatura jwsDocumentSignature
+
+Assina os elementos principais do documento fiscal, como:
+
+ {
+    "documentNo": "...",
+    "taxRegistrationNumber": "...",
+    "documentType": "...",
+    "documentDate": "...",
+    "customerTaxID": "...",
+    "customerCountry": "...",
+    "companyName": "...",
+    "documentTotals": {
+        "taxPayable": 70,
+        "netTotal": 500,
+        "grossTotal": 570
+     }
+ }
+
+❗ Novamente, assina-se o objeto completo.
+Assinatura jwsSignature (Assinatura da Requisição)
+
+Assina o objeto principal da requisição — por exemplo:
+
+ {
+    "taxRegistrationNumber": "5001234567",
+    "requestID": "REQ-000001"
+ }
+
+NOTA: O payload pode variar de acordo a requisição.
+
+Isto permite autenticação forte a cada chamada importante.
+Exemplos de Geração em Diferentes Linguagens
+Node.js
+
+ const fs = require("fs");
+ const jwt = require("jsonwebtoken");
+ const privateKey = fs.readFileSync("private.pem", "utf8");
+ const payload = {
+    softwareName: "ClinicaHub",
+    softwareVersion: "1.0.0",
+    softwareValidationNo: "123456789"
+ };
+
+ const token = jwt.sign(payload, privateKey, { algorithm: "RS256" });
+
+ console.log(token);
+
+Java
+
+ import java.nio.file.*;
+ import java.security.*;
+ import java.security.spec.*;
+ import io.jsonwebtoken.*;
+ String key = Files.readString(Path.of("private.pem"));
+ PrivateKey privateKey = Keys.privateKeyFromPem(key);
+ Map<String, Object> payload = Map.of(
+ "softwareName", "ClinicaHub",
+ "softwareVersion", "1.0.0",
+ "softwareValidationNo", "123456789"
+ );
+
+ String jws = Jwts.builder()
+
+.setClaims(payload)
+
+.signWith(privateKey, SignatureAlgorithm.RS256)
+
+.compact();
+
+ System.out.println(jws);
+
+C# (.NET)*
+
+ using System.IdentityModel.Tokens.Jwt;
+ using Microsoft.IdentityModel.Tokens;
+ using System.Security.Cryptography;
+ var payload = new Dictionary<string, object>
+
+ {
+    { "softwareName", "ClinicaHub" },
+    { "softwareVersion", "1.0.0" },
+    { "softwareValidationNo", "123456789" }
+ };
+
+ var privateKey = RSA.Create();
+ privateKey.ImportFromPem(File.ReadAllText("private.pem"));
+ var credentials = new SigningCredentials(
+ new RsaSecurityKey(privateKey),
+ SecurityAlgorithms.RsaSha256
+ ) ;
+
+ var token = new JwtSecurityToken(
+ claims: payload.Select(kv => new Claim(kv.Key, kv.Value.ToString())), signingCredentials: credentials
+);
+
+var jwt = new JwtSecurityTokenHandler().WriteToken(token);
+
+Console.WriteLine(jwt);
+
+Go
+
+package main
+
+ import ("fmt" "os" jwt "github.com/golang-jwt/jwt/v5")
+
+ func main(){
+
+ keyData, _ := os.ReadFile("private.pem")
+ privateKey, _ := jwt.ParseRSAPrivateKeyFromPEM(keyData)
+
+ payload := jwt.MapClaims
+ {
+    "softwareName": "ClinicaHub",
+    "softwareVersion": "1.0.0",
+    "softwareValidationNo": "123456789",
+ }
+
+ token := jwt.NewWithClaims(jwt.SigningMethodRS256, payload)
+ signed, _ := token.SignedString(privateKey)
+ fmt.Println(signed)
+}
+
+Python
+
+ import jwt
+
+ with open("private.pem", "r") as f:
+
+ private_key = f.read()
+
+ payload = {
+    "softwareName": "ClinicaHub",
+    "softwareVersion": "1.0.0",
+    "softwareValidationNo": "123456789"
+ }
+
+ token = jwt.encode(payload, private_key, algorithm="RS256")
+
+ print(token)
+
+Erros Comuns na Geração de JWS
+
+❌ Concatenar campos ao invés de assinar o JSON
+✔ A assinatura é sempre sobre o objeto JSON completo.
+
+❌ Usar RSA com chave inferior a 2048 bits
+✔ Recomendado: no mínimo 2048 bits.
+
+❌ Assinar com chave pública
+✔ A assinatura é feita com private key.
+
+❌ Codificação Base64 normal
+✔ Deve usar Base64URL, sem padding =.
+
+
+4. Serviços Disponiveis
+
+4.1: Solicitar Criação de Série
+
+
+
+Serviço destinado a solicitar a criação de séries de numeração de Faturas Electrónicas, devolvendo em resposta um indicador de sucesso ou insucesso.
+Características do Serviço
+
+POST registar factura
+POST https://sifphml.minfin.gov.ao/sigt/fe/ws/v1/registarFactura
+Payload de entrada para solicitar criação de série
+
+ {
+    "schemaVersion": "1.2",
+    "submissionUUID": "a1b2c3d4-e5f6-7890-g1h2-i238j234k5122",
+    "taxRegistrationNumber": "5001636863",
+    "submissionTimeStamp": "2025-09-02T14:30:00Z",
+    "softwareInfo": {
+        "softwareInfoDetail": {
+            "productId": "Meu ERP CERTO",
+            "productVersion": "1.0.1",
+            "softwareValidationNumber": "C_134"
+        },
+        "jwsSoftwareSignature": "eyJ0eXAiOiJKT1NFIiwiYWxnIjoiUlMyNTYifQ.eyJwcm9kdWN0SWQiOiJNZXUgRVJQIENFUlRPIiwicHJvZHVjdFZlcnNpb24iOiIxLjAuMSIsInNvZnR3YXJlVmFsaWRhdGlvbk51bWJlciI6IkNfMTM0In0.VE3zkvOJOpqBfz4wpx4KCgcwOGgzGUP3MSMbaHCDnHhwOaeA6jlccBW9HjgQvg2tYCVVq0imrU_z0grEHNthhG4xD3afSOD1_RzvHs8Tc45dvztHJzB4gF0CAX-yIDwi7XcHiMRY0vkXOETBeHKewg0ktWSnZ7SLf4GxGzE7ry2u_pmhqhCPhxpa0oGQ_rBJUYkEAFg1OwaqjwvzCFgdT11r-XsHmnkcfJX_ktj59RWR_zgbytiCRtwCK9LNUflveS5GzUaCXbPn2deQ3F2hPldLECEa_ahwoapoK1LhkgOAVyPLJf6M1Cm09Le7rkdSaWQSW5BI_sPx5YaUaXkeqg"
+    },
+    "seriesYear": "2025",
+    "documentType": "LD",
+    "establishmentNumber": "10",
+    "jwsSignature": "string",
+    "seriesContingencyIndicator": "N"
+}
+
+Payload assinatura Solicitar Serie
+
+{
+    "taxRegistrationNumber": "...",
+    "seriesYear": "...",
+    "documentType": "...",
+    "establishmentNumber": "...",
+    "seriesContingencyIndicator": "..."
+}
+
+Payload de Saída(resposta)
+
+ {
+    "resultCode": 1,
+    "errorList": [
+        ""
+    ],
+    "seriesFEResult": {
+        "seriesCode": "LD6325S2042N",
+        "authorizedQuantity": "999999999999",
+        "firstDocumentNo": "1",
+        "lastDocumentNo": "999999999999"
+    }
+ }
+
+Parâmetros de entrada
+Campo 	Tipo (JSON) 	Atributos 	Obrigatório 	Descrição
+
+schemaVersion
+	
+
+string
+	
+
+N/A
+	
+
+Sim
+	
+
+Versão do schema do serviço, exemplo “1.0”.
+
+submissionUUID
+	
+
+string
+	
+
+N/A
+	
+
+Sim
+	
+
+Identificador único da solicitação, fornecido pelo software no formato UUID standard “xxxxxxxx-xxxx-Mxxx-Nxxx-xxxxxxxxxxxx” em que:
+
+    Cada x é um dígito hexadecimal (0–9, a–f);
+
+    M indica a versão do UUID (por exemplo, 4 para UUID versão 4 — aleatório);
+
+    N indica o variant (especifica o layout; para UUIDs compatíveis com RFC 4122, os primeiros bits de N devem estar entre 8 e b).
+
+Exemplo:
+
+550e8400-e29b-41d4-a716-446655440000
+
+Este identificador deverá ser único por cada submissão do contribuinte emissor.
+
+taxRegistrationNumber
+	
+
+string
+	
+
+“maxlength”: 15
+	
+
+Sim
+	
+
+Número fiscal do contribuinte.
+
+submissionTimeStamp
+	
+
+string
+	
+
+N/A
+	
+
+Sim
+	
+
+Timestamp de submissão do pedido no formato ISO 8601, exemplos:
+
+    "2025-05-27T14:30:00Z" (em UTC)
+
+    "2025-05-27T14:30:00-03:00" (com informação de timezone)
+
+softwareInfo
+	
+
+object
+	
+
+N/A
+	
+
+Sim
+	
+
+Objecto com os dados do Software de Facturação
+
+jwsSignature
+	
+
+string
+	
+
+“minlength” : 256
+
+“maxlength”: 256
+	
+
+Sim
+	
+
+Assinatura digital da solicitação de criação de série, usando a chave privada do emissor através do algoritmo RS256 (RSA + SHA-256). Os campos da solicitação a serem utilizados na assinatura são:
+
+    taxRegistrationNumber
+
+    seriesCode
+
+    seriesYear
+
+    documentType
+
+    firstDocumentNumber
+
+seriesYear
+	
+
+integer
+	
+
+N/A
+	
+
+Sim
+	
+
+Ano de emissão associado à série de numeração das facturas. De 1 de Janeiro até 15 de Dezembro é possível criar séries somente para o ano de sistema, após essa data é possível criar séries para o ano de sistema e para o ano imediatamente posterior ao do sistema.
+
+documentType
+	
+
+string
+	
+
+“minlength” : 2
+
+“maxlength”: 2
+	
+
+Sim
+	
+
+Tipo de documento de facturação electrónica, com os seguintes valores possíveis e significados:
+
+    FA - Factura de Adiantamento
+
+    FT - Factura
+
+    FR - Factura/Recibo
+
+    FG - Factura Global
+
+    GF - Factura Genérica
+
+    AC - Aviso de Cobrança
+
+    AR - Aviso de Cobrança/Recibo
+
+    TV - Talão de Venda
+
+    RC - Recibo Emitido
+
+    RG - Outros Recibos Emitidos
+
+    RE - Estorno ou Recibo de Estorno
+
+    ND - Nota de Débito
+
+    NC - Nota de Crédito
+
+    AF - Factura/Recibo de Autofacturação
+
+    RP - Prémio ou Recibo de Prémio
+
+    RA - Resseguro Aceite
+
+    CS - Imputação a Co-seguradoras
+
+    LD - Imputação a Co-seguradora Líder
+
+establishmentNumber
+	
+
+string
+	
+
+“minlength” : 1
+“maxlength”: 200
+	
+
+Sim
+	
+
+Identifica o estabelecimento que solicita a emissão de facturas. Este campo garante que cada série de contingência esteja unicamente associada ao respectivo estabelecimento dentro da organização do contribuinte.
+
+seriesContingencyIndicator
+	
+
+string
+	
+
+“maxlength”: 1
+	
+
+Sim
+	
+
+Indicador que identifica se a série de numeração de facturas se destina a emissão em regime de contingência, com os seguintes valores possíveis e significados:
+
+N – Série do regime normal de emissão;
+
+C – Série criada para suportar a emissão em contingência.
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+Composição (properties) do object softwareInfo
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+*Campo 	
+
+*Tipo (JSON) 	
+
+*Atributos 	
+
+*Obrigatório 	
+
+*Descrição
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+softwareInfoDetail
+	
+
+object
+	
+
+N/A
+	
+
+Sim
+	
+
+Objecto com os detalhes do Software de Facturação
+
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+jwsSoftwareSignature
+	
+
+string
+	
+
+“minlength” : 256
+
+“maxlength”: 256
+	
+
+Sim
+	
+
+Assinatura digital do Software de Facturação usando a chave privada do software, através o algoritmo RS256 (RSA + SHA-256).
+Todos os campos do objecto softwareInfo devem ser usados na assinatura.
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Composição (properties) do object softwareInfoDetail
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Campo 	
+
+Tipo (JSON) 	
+
+Atributos 	
+
+Obrigatório 	
+
+Descrição
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+*productId
+----------------------------------------------------------------------------------------------------------------------------------------------------------	
+string
+----------------------------------------------------------------------------------------------------------------------------------------------------------	
+N/A
+----------------------------------------------------------------------------------------------------------------------------------------------------------	
+Sim
+----------------------------------------------------------------------------------------------------------------------------------------------------------	
+Nome do Software de Facturação.
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+*productVersion
+	
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+string
+	
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+N/A
+	
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+Sim
+	
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+Versão do Software de Facturação.
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+*softwareValidationNumber
+----------------------------------------------------------------------------------------------------------------------------------------------------------	
+string
+----------------------------------------------------------------------------------------------------------------------------------------------------------	
+N/A
+----------------------------------------------------------------------------------------------------------------------------------------------------------	
+Sim
+----------------------------------------------------------------------------------------------------------------------------------------------------------	
+Número de Certificação do Software de Facturação.
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+#Parâmetros de saída
+
+*HTTP code 	
+
+*Tipo (JSON) 	
+
+*Descrição
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+200
+	
+
+object seriesFEResult
+	
+
+Registo de pedido efectuado com sucesso sendo devolvido um object do tipo seriesFEResult com os dados da quantidade e 1ª e última facturas com emissão autorizada pela AGT para a série solicitada.
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+400
+	
+
+array errorList
+	
+
+Registo de pedido efectuado com erros, sendo devolvida uma lista de erros na recepção dos dados da factura.
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+#Códigos e mensagens de erro
+
+Tendo em conta as regras de negócio, são propostos os seguintes erros de validação:
+
+-------------------------------------------------------------------------------------------------------
+*Regra de negócio 	   
+
+*Código de erro 	       
+
+*Descrição de erro
+-----------------------------------------------------------------------------------------------------
+
+FE-RNG-010
+	
+
+E08
+	
+A assinatura do produtor de software “jwsSoftwareSignature” não está de acordo com a informação transmitida.
+-------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-011
+	
+
+E39
+	
+
+Os dados constantes na assinatura do produtor de software “jwsSoftwareSignature” não estão de acordo com a informação constante no Processo de Certificação do Software.
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-032
+	
+
+E40
+	
+
+Os dados constantes na assinatura da chamada do serviço “jwsSignature” não estão de acordo com a informação constante na chamada do serviço.
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-049
+	
+
+E30
+	
+
+Contribuinte especificado no parâmetro <parâmetro> (<valor do parâmetro>) não possui actividade registada no sistema da AGT.
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-050
+	
+
+E06
+	
+
+Contribuinte especificado no parâmetro <parâmetro> (<valor do parâmetro>) não aderiu à facturação electrónica no sistema da AGT.
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-051
+	
+
+E31
+	
+
+Código de série de numeração (<valor do parâmetro1>) já se encontra em utilização para o contribuinte (<valor do parâmetro2>).
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-053
+	
+
+E32
+	
+
+Código de série mal construído (<valor do parâmetro>), deverá conter o ano de emissão com 2 ou 4 dígitos.
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+FE-RNG-055
+	
+
+E33
+	
+
+Ano de emissão da série (<valor do parâmetro 1>) deve coincidir com o ano da data de sistema (<valor do parâmetro 2> (solicitações anteriores a 15 de Dezembro).
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+FE-RNG-056
+	
+
+E34
+	
+
+Série da factura (<valor do parâmetro 1>) é inexistente para o contribuinte (<valor do parâmetro 2>).
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+FE-RNG-057
+	
+
+E35
+	
+
+A factura que se pretende criar (<valor do parâmetro 1>) refere-se a uma série de numeração de documentos de facturação não electrónicos.
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+FE-RNG-058
+	
+
+E36
+	
+
+O Software de Facturação que está a gerar a factura (<valor do parâmetro 1>) não coincide com o Software de Facturação que gerou a série (<valor do parâmetro 2>).
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+FE-RNG-059
+	
+
+E37
+	
+
+O tipo de factura a emitir (<valor do parâmetro 1>) não coincide com o tipo de factura que foi destinada a série de facturação (<valor do parâmetro 2>).
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+FE-RNG-060
+	
+
+E38
+	
+
+O ano de emissão da factura (<valor do parâmetro 1>) não coincide com o ano de emissão a que se refere a série de facturas (<valor do parâmetro 2>).
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+FE-RNG-080
+	
+
+E48
+	
+
+O estabelecimento referido (<valor do parâmetro 1>) é desconhecido, tem de ser previamente registado nos dados de adesão do emissor (<valor do parâmetro 2>) à facturação electrónica.
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+FE-RNG-081
+	
+
+E49 -
+
+A serie cuja ampliação foi solicitada, identifica o estabelecimento (<valor do parâmetro 1>), mas a serie foi originalmente criada para o estabelecimento (<valor do parâmetro 2>) pelo que o pedido não pode ser aprovado.
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+O presente documento tem como principal objectivo desenhar uma solução/modelo que possibilite a comunicação electrónica automatizada e em tempo real de todas as facturas geradas pelos contribuintes por intermédio de serviços (webservices).
+
+
+
+4.2: Listar Séries
+
+
+Serviço destinado a obter a lista de séries de numeração registadas em nome do contribuinte, devolvendo em resposta a lista de séries de numeração encontradas e respectivas datas de emissão.
+Características do Serviço
+
+POST listar series
+POST https://sifphml.minfin.gov.ao/sigt/fe/v1/listarSeries
+Exemplo do Pedido(Payload)
+
+ {
+    "schemaVersion": "string",
+    "taxRegistrationNumber": "5001636863",
+    "submissionTimeStamp": "2025-10-28T18:51:10.178Z",
+    "seriesCode": "LD6325S1N",
+    "seriesYear": "2025",
+    "seriesStatus": "A",
+    "documentType": "LD",
+    "establishmentNumber": 10,
+    "jwsSignature": "string",
+    "softwareInfo": {
+        "softwareInfoDetail": {
+                "productId": "Meu ERP CERTO",
+                "productVersion": "1.0.1",
+                "softwareValidationNumber": "C_134"
+            },
+            "jwsSoftwareSignature": "eyJ0eXAiOiJKT1NFIiwiYWxnIjoiUlMyNTYifQ.eyJwcm9kdWN0SWQiOiJNZXUgRVJQIENFUlRPIiwicHJvZHVjdFZlcnNpb24iOiIxLjAuMSIsInNvZnR3YXJlVmFsaWRhdGlvbk51bWJlciI6IkNfMTM0In0.VE3zkvOJOpqBfz4wpx4KCgcwOGgzGUP3MSMbaHCDnHhwOaeA6jlccBW9HjgQvg2tYCVVq0imrU_z0grEHNthhG4xD3afSOD1_RzvHs8Tc45dvztHJzB4gF0CAX-yIDwi7XcHiMRY0vkXOETBeHKewg0ktWSnZ7SLf4GxGzE7ry2u_pmhqhCPhxpa0oGQ_rBJUYkEAFg1OwaqjwvzCFgdT11r-XsHmnkcfJX_ktj59RWR_zgbytiCRtwCK9LNUflveS5GzUaCXbPn2deQ3F2hPldLECEa_ahwoapoK1LhkgOAVyPLJf6M1Cm09Le7rkdSaWQSW5BI_sPx5YaUaXkeqg"
+    }
+ }
+
+Payload assinatura Listar Serie
+
+ {
+   "taxRegistrationNumber": "..."
+ }
+
+Exemplo da Resposta(Payload)
+
+ {
+    "resultCode": "1",
+    "seriesResultCount": "0",
+    "seriresInfo": []
+ }
+
+O presente documento tem como principal objectivo desenhar uma solução/modelo que possibilite a comunicação electrónica automatizada e em tempo real de todas as facturas geradas pelos contribuintes por intermédio de serviços (webservices).
+
+Para o efeito foi conceptualizado um modelo de faturação electrónica envolvendo todas os intervenientes no processo que garante o reporte de toda informação solicitada sem criar qualquer tipo de entrave ou constrangimento ao normal processamento das transacções entre agentes económicos.
+
+
+Parâmetros de entrada
+
+Campo 	
+
+Tipo (JSON) 	
+
+Atributos 	
+
+Obrigatório 	
+
+Descrição
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+schemaVersion
+	
+
+string
+	
+
+N/A
+	
+
+Sim
+	
+
+Versão do schema do serviço, exemplo “1.0”
+
+taxRegistrationNumber
+	
+
+string
+	
+
+“maxlength”: 15
+	
+
+Sim
+	
+
+Número fiscal de contribuinte
+
+submissionTimeStamp
+	
+
+string
+	
+
+N/A
+	
+
+Sim
+	
+
+Timestamp de submissão do pedido no formato ISO 8601, exemplos:
+
+    "2025-05-27T14:30:00Z" (em UTC)
+
+    "2025-05-27T14:30:00-03:00" (com informação de timezone)
+
+softwareInfo
+	
+
+object
+	
+
+N/A
+	
+
+Sim
+	
+
+Objecto com os dados do Software de Facturação
+
+jwsSignature
+	
+
+string
+	
+
+“minlength” : 256
+
+“maxlength”: 256
+	
+
+Sim
+	
+
+Assinatura digital da solicitação usando a chave privada do emissor através do algoritmo RS256 (RSA + SHA-256). Os campos a serem utilizados na assinatura são:
+
+    taxRegistrationNumber
+
+    documentNo
+
+seriesCode
+	
+
+string
+	
+
+“minlength” : 3
+
+“maxlength”: 60
+	
+
+Não
+	
+
+Código da série de numeração de documentos de facturação electrónica, tendo como requisito que deverá conter na sua composição o ano de emissão dos documentos de facturação, com 2 ou 4 dígitos (exemplos: 25 ou 2025, no entanto para a emissão em contingência deve apresenta 25C ou 2025C), deverá ser composto por caracteres alfanuméricos.
+
+seriesYear
+	
+
+integer
+	
+
+N/A
+	
+
+Não
+	
+
+Ano de emissão associado à série de numeração dos documentos de facturação.
+
+documentType
+	
+
+string
+	
+
+“minlength” : 2
+
+“maxlength”: 2
+	
+
+Não
+	
+
+Tipo de documento de facturação electrónica, com os seguintes valores possíveis e significados:
+
+    FA - Factura de Adiantamento
+
+    FT - Factura
+
+    FR - Factura/Recibo
+
+    FG - Factura Global
+
+    GF – Factura Genérica
+
+    AC - Aviso de Cobrança
+
+    AR - Aviso de Cobrança/Recibo
+
+    TV - Talão de Venda
+
+    RC - Recibo Emitido
+
+    RG - Outros Recibos Emitidos
+
+    RE - Estorno ou Recibo de Estorno
+
+    ND - Nota de Débito
+
+    NC - Nota de Crédito
+
+    AF - Factura/Recibo de Autofacturação
+
+    RP - Prémio ou Recibo de Prémio
+
+    RA - Resseguro Aceite
+
+    CS - Imputação a Co-seguradoras
+
+    LD - Imputação a Co-seguradora Líder
+
+establishmentNumber
+	
+
+string
+	
+
+“minlength” : 1
+“maxlength”: 200
+	
+
+Sim
+	
+
+Identifica o estabelecimento que solicita a emissão de facturas em regime de contingência offline. Este campo garante que cada série de contingência esteja unicamente associada ao respectivo estabelecimento dentro da organização do contribuinte.
+
+seriesStatus
+	
+
+string
+	
+
+“minlength” : 2
+
+“maxlength”: 2
+	
+
+Não
+	
+
+Estado da série de numeração da facturação, com os seguintes valores possíveis e significados:
+
+    A - Série aberta
+
+    U - Série em utilização
+
+    F - Série fechada (após expirado o respectivo ano de emissão)
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Composição (properties) do object documentListResult
+
+Campo 	
+
+Tipo (JSON) 	
+
+Atributos 	
+
+Obrigatório 	
+
+Descrição
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+documentResultCount
+	
+
+integer
+	
+
+N/A
+	
+
+Sim
+	
+
+Número de facturas que foram encontradas para os critérios de pesquisa especificados.
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+documentResultList
+	
+
+array
+	
+
+N/A
+	
+
+Sim
+	
+
+Dados (identificação e data de emissão) da factura electrónica encontrada para o período Array com a lista de dados de facturas (object documentResultList).
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+Composição (properties) do array documentResultList
+
+
+Campo 	
+
+Tipo (JSON) 	
+
+Atributos 	
+
+Obrigatório 	
+
+Descrição
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+documentNo
+	
+
+string
+	
+
+“maxlength”: 60
+	
+
+Sim
+	
+
+Identificador da factura electrónica que se pretende consultar (enviado como parâmetro na chamada).
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+documentDate
+	
+
+string
+	
+
+“format”: “date”
+	
+
+Sim
+	
+
+Data de emissão da factura electrónica encontrada
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Parâmetros de Saída
+
+
+HTTP code 	
+
+Tipo (JSON) 	
+
+Descrição
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+200
+	
+
+object
+
+seriesListResult
+	
+
+Registo de pedido efectuado com sucesso sendo devolvido um object do tipo seriesListResult com os dados das séries de numeração de facturas encontradas.
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+422
+	
+
+Object errorEntry
+	
+
+Chamada ocorreu com erro, sendo enviado uma mensagem (código e descrição) correspondente ao erro “E94” - “erro na chamada, nif diferente”
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+429
+	
+
+Object errorEntry
+	
+
+Chamada ocorreu com erro, sendo enviado uma mensagem (código e descrição) correspondente ao erro “E98” - “erro na chamada, demasiadas solicitações repetidas”
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+400
+	
+
+Object errorEntry
+	
+
+Chamada ocorreu com erro, sendo enviado uma mensagem (código e descrição) correspondente ao erro “E96” - “solicitação mal efectuada – erro de estrutura”
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+#Códigos e mensagens de erro no retorno do Serviço
+
+Tendo em conta as regras de negócio, são propostos adicionalmente os seguintes erros de validação:
+
+Regra de negócio 	
+
+Código de erro 	
+
+Descrição de erro
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-010
+	
+
+E08
+	
+
+A assinatura do Produtor de Software “jwsSoftwareSignature” não está de acordo com a informação transmitida.
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-011
+	
+
+E39
+	
+
+Os dados constantes na assinatura do Produtor de Software “jwsSoftwareSignature” divergem da informação constante no processo de Certificação do Software.
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-032
+	
+
+E40
+
+Os dados constantes na assinatura da chamada do serviço “jwsSignature” não estão de acordo com a informação constante na chamada do serviço.
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+4.3: Registar Factura
+
+
+Registar Factura
+
+Serviço destinado à recepção de pedidos de registo de facturas electrónicas, devolvendo em resposta o identificador único do pedido, identificador essencial para acompanhar o processo de validação posterior que indicará se a factura validou ou não com sucesso. Caso o pedido não seja aceite é dada informação dos problemas que levaram à sua rejeição.
+Características do Serviço
+
+POST registar factura :method: POST :url: https://sifphml.minfin.gov.ao/sigt/fe/v1/registarFactura
+
+POST https://sifphml.minfin.gov.ao/sigt/fe/v1/registarFactura
+
+Payload de entrada para solicitar criação de série
+
+ {
+    "schemaVersion": "1.2",
+    "submissionUUID": "a1b2c3d4-e5f6-7890-g1h2-i23822j2232-3784",
+    "taxRegistrationNumber": "5001636863",
+    "submissionTimeStamp": "2025-11-04T14:30:00Z",
+    "softwareInfo": {
+        "softwareInfoDetail": {
+            "productId": "Meu ERP CERTO",
+            "productVersion": "1.0.1",
+            "softwareValidationNumber": "C_134"
+        },
+        "jwsSoftwareSignature": "eyJ0eXAiOiJKT1NFIiwiYWxnIjoiUlMyNTYifQ.eyJwcm9kdWN0SWQiOiJNZXUgRVJQIENFUlRPIiwicHJvZHVjdFZlcnNpb24iOiIxLjAuMSIsInNvZnR3YXJlVmFsaWRhdGlvbk51bWJlciI6IkNfMTM0In0.VE3zkvOJOpqBfz4wpx4KCgcwOGgzGUP3MSMbaHCDnHhwOaeA6jlccBW9HjgQvg2tYCVVq0imrU_z0grEHNthhG4xD3afSOD1_RzvHs8Tc45dvztHJzB4gF0CAX-yIDwi7XcHiMRY0vkXOETBeHKewg0ktWSnZ7SLf4GxGzE7ry2u_pmhqhCPhxpa0oGQ_rBJUYkEAFg1OwaqjwvzCFgdT11r-XsHmnkcfJX_ktj59RWR_zgbytiCRtwCK9LNUflveS5GzUaCXbPn2deQ3F2hPldLECEa_ahwoapoK1LhkgOAVyPLJf6M1Cm09Le7rkdSaWQSW5BI_sPx5YaUaXkeqg"
+    },
+    "numberOfEntries": 1,
+    "documents": [
+        {
+            "documentNo": "FT FT6325S2C/10006",
+            "documentStatus": "N",
+            "jwsDocumentSignature": "eyJ0eXAiOiJKT1NFIiwiYWxnIjoiUlMyNTYifQ.eyJkb2N1bWVudE5vIjoiRlQgRlQ2MzI1UzJDLzEwMDA2IiwidGF4UmVnaXN0cmF0aW9uTnVtYmVyIjoiNTAwMTYzNjg2MyIsImRvY3VtZW50VHlwZSI6IkZUIiwiZG9jdW1lbnREYXRlIjoiMjAyNS0xMS0wNCIsImN1c3RvbWVyVGF4SUQiOiJQVDk4NzY1NDMyMSIsImN1c3RvbWVyQ291bnRyeSI6IlBUIiwiY29tcGFueU5hbWUiOiJDbGllbnRlIEV4ZW1wbG8gTGRhIn0.Sg0jnyksnnXtXUkf5PaoZrRtf3kiNkw3urFaE2D1fHLLLw_hQWc896-cGbRVnJGRHPrcnOnEQqQ-ws5R51erzadVstr9Q1yUd0CIvUhszGO15t6m0H--O9VtNMWEOp2asP4P80LD4m55y5rX2stCCGAmTI2N1cAWAhw1JbRr2Zb378y8ZI8dicfJm1QDzs5YKmXrRqXH9yvaF62SHXXfpv5gzLRAAbRwjvY7roso_PRuue9Ke1w0hojnpBmr_zUg0D3eBa-eUjtVPMQsbl5DXBFhr4Qydr4Q04tvUqLBAeGpQmxTRZGs2OCjQzdz2tYIZSbEiFR9Zo6EwL1s1tsRnA",
+            "documentDate": "2025-11-04",
+            "documentType": "FT",
+            "eacCode": "12345",
+            "systemEntryDate": "2025-11-04T11:15:30Z",
+            "customerTaxID": "PT987654321",
+            "customerCountry": "PT",
+            "companyName": "Cliente Exemplo Lda",
+            "lines": [
+                {
+                    "lineNumber": 1,
+                    "productCode": "PROD001",
+                    "productDescription": "Produto Exemplo 1",
+                    "quantity": 2,
+                    "unitOfMeasure": "UN",
+                    "unitPrice": 250,
+                    "unitPriceBase": 250,
+                    "debitAmount": 0,
+                    "creditAmount": 500,
+                    "taxes": [
+                        {
+                            "taxType": "IVA",
+                            "taxCountryRegion": "AO",
+                            "taxCode": "NOR",
+                            "taxPercentage": 14,
+                            "taxContribution": 70
+                        }
+                    ],
+                    "settlementAmount": 0
+                }
+            ],
+            "documentTotals": {
+                "taxPayable": 70,
+                "netTotal": 500,
+                "grossTotal": 570
+            },
+            "withholdingTaxList": [
+                {
+                    "withholdingTaxType": "IRT",
+                    "withholdingTaxDescription": "Retenção na fonte",
+                    "withholdingTaxAmount": 16.5
+                }
+            ]
+        }
+    ]
+ }
+
+Payload assinatura Registar Factura
+
+ {
+    "documentNo": "...",
+    "taxRegistrationNumber": "...",
+    "documentType": "...",
+    "documentDate": "...",
+    "customerTaxID": "...",
+    "customerCountry": "...",
+    "companyName": "...",
+    "documentTotals": {
+        "taxPayable": 70,
+        "netTotal": 500,
+        "grossTotal": 570
+    }
+ }
+
+Payload de Saída(resposta)
+
+ {
+    {
+        "requestID": "202500000010689",
+        "errorList": []
+    }
+ }
+
+
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Parâmetros de entrada
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+*Campo 	
+
+*Tipo (JSON) 	
+
+*Atributos 	
+
+*Obrigatório 	
+
+*Descrição
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+schemaVersion
+	
+
+string
+	
+
+N/A
+	
+
+Sim
+	
+
+Versão do schema do serviço, exemplo “1.0”
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+submissionUUID
+	
+
+string
+	
+
+N/A
+	
+
+Sim
+	
+
+Identificadorúnico da solicitação fornecido pelo software, no formato UUID standard “xxxxxxxx-xxxx-Mxxx-Nxxx-xxxxxxxxxxxx” em que:
+
+    Cada x é um dígito hexadecimal (0–9, a–f);
+
+    M indica a versão do UUID (por exemplo, 4 para UUID versão 4 — aleatório);
+
+    N indica o variant (especifica o layout; para UUIDs compatíveis com RFC 4122, os primeiros bits de N devem estar entre 8 e b).
+
+Exemplo:
+
+550e8400-e29b-41d4-a716-446655440000
+
+Este identificador deverá ser único por cada submissão do contribuinte emissor.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+taxRegistrationNumber
+	
+
+string
+	
+
+“maxlength”: 15
+	
+
+Sim
+	
+
+Número fiscal de contribuinte.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+submissionTimeStamp
+	
+
+string
+	
+
+N/A
+	
+
+Sim
+	
+
+Timestamp de submissão do pedido no formato ISO 8601, exemplos:
+
+    "2025-05-27T14:30:00Z" (em UTC);
+
+    "2025-05-27T14:30:00-03:00" (com informação de timezone).
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+softwareInfo
+	
+
+object
+	
+
+N/A
+	
+
+Sim
+	
+
+Objecto com os dados do Software de Facturação.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+numberOfEntries
+	
+
+integer
+	
+
+N/A
+	
+
+Sim
+	
+
+Número de facturas que constam na chamada ao serviço.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+documents
+	
+
+array
+	
+
+N/A
+	
+
+Sim
+	
+
+Array com a lista de facturas (object document) Prevê-se um máximo de 30 facturas.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+Composição (properties) do object softwareInfo
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+*Campo 	
+
+*Tipo (JSON) 	
+
+*Atributos 	
+
+*Obrigatório 	
+
+*Descrição
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+softwareInfoDetail
+	
+
+object
+	
+
+N/A
+	
+
+Sim
+	
+
+Objecto com os detalhes do Software de Facturação
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+jwsSoftwareSignature
+	
+
+string
+	
+
+“minlength” : 256
+
+“maxlength”: 256
+	
+
+Sim
+	
+
+Assinatura digital do Software de Facturação usando a chave privada do software, através o algoritmo RS256 (RSA + SHA-256).
+Todos os campos do objecto softwareInfo devem ser usados na assinatura.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+Composição (properties) do object softwareInfoDetail
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+*Campo 	
+
+*Tipo (JSON) 	
+
+*Atributos 	
+
+*Obrigatório 	
+
+*Descrição
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+productId
+	
+
+string
+	
+
+N/A
+	
+
+Sim
+	
+
+Nome do Software de Facturação.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+productVersion
+	
+
+string
+	
+
+N/A
+	
+
+Sim
+	
+
+Versão do Software de Facturação.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+softwareValidationNumber
+	
+
+string
+	
+
+N/A
+	
+
+Sim
+	
+
+Número de Certificação do Software de Facturação.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+Composição (itens) do array documents
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+*Campo 	
+
+*Tipo (JSON) 	
+
+*Atributos 	
+
+*Obrigatório 	
+
+*Descrição
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+document
+	
+
+object
+	
+
+N/A
+	
+
+Sim
+	
+
+Array com a lista de documentos (object document) Prevê-se um máximo de 30 documentos.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Composição (properties) do object document
+
+*Campo 	
+
+*Tipo (JSON) 	
+
+*Atributos 	
+
+*Obrigatório 	
+
+*Descrição
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+documentNo
+	
+
+string
+	
+
+“minlength” : 8
+
+“maxlength”: 60
+	
+
+Sim
+	
+
+Identificação única do documento, gerado pelo Software de Facturação de documentos em conformidade com o documento SAF-T(AO).
+Consiste de um código de documento interno - espaço - número de série do documento -/- e um número sequencial do documento para a sequência de consentimento.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+documentStatus
+	
+
+string
+	
+
+“minlength” : 1
+
+“maxlength”: 1
+	
+
+Sim
+	
+
+Estado actual do documento de facturação, com os seguintes valores possíveis e significados:
+
+    N - Normal
+
+    S - Autofacturação
+
+    A - Anulado
+
+    R - Documento de resumo de outros documentos criados noutras aplicações e gerado nesta aplicação
+
+    C – Documento gerado para correcção de documento anteriormente gerado e rejeitado pela AGT (identificado no campo rejectedDocumentNo)
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+documentCancelReason
+	
+
+String
+	
+
+“minlength” : 1
+
+“maxlength”: 1
+	
+
+Não
+	
+
+Motivo de anulação do documento de facturação de acordo com o previsto na legislação (nºs 8 e 9 do art.º 8º do Decreto Presidencial 71/25), com os seguintes valores possíveis e significados:
+
+    I – anulada por incorrecta identificação do adquirente.
+
+    N – anulada por não ter sido enviado o documento ao adquirente.
+
+O preenchimento deste campo é obrigatório quando o estado do documento transmitido é anulado (documentStatus = “A”).
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+rejectedDocumentNo
+	
+
+String
+	
+
+“minlength” : 8
+
+“maxlength”: 60
+	
+
+Não
+	
+
+Identificação do número de documento previamente submetido à AGT e rejeitado por falta de conformidade.
+
+O preenchimento deste campo é obrigatório quando a informação de estado do documento transmitido é correcção (documentStatus = “C”).
+
+O documento identificado nesta correcção será verificado se corresponde a uma rejeição no histórico de pedidos de registo de facturas emitidas.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+jwsDocumentSignature
+	
+
+string
+	
+
+“minlength” : 256
+
+“maxlength”: 256
+	
+
+Sim
+	
+
+Assinatura digital da factura usando a chave privada do emissor através do algoritmo RS256 (RSA + SHA-256). Os campos das facturas a ser utilizados na assinatura são:
+
+    documentNo
+
+    taxRegistrationNumber
+
+    documentType
+
+    documentDate
+
+    customerTaxID
+
+    customerCountry
+
+    companyName
+
+    documentTotals
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+documentDate
+	
+
+string
+	
+
+“format”: “date”
+	
+
+Sim
+	
+
+Data de emissão do documento
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+documentType
+	
+
+string
+	
+
+“minlength” : 2
+
+“maxlength”: 2
+	
+
+Sim
+	
+
+Tipo de documento de facturação electrónica, com os seguintes valores possíveis e significados:
+
+    FA - Factura de Adiantamento
+
+    FT - Factura
+
+    FR - Factura/Recibo
+
+    FG - Factura Global
+
+    GF - Factura Genérica
+
+    AC - Aviso de Cobrança
+
+    AR - Aviso de Cobrança/Recibo
+
+    TV - Talão de Venda
+
+    RC - Recibo Emitido
+
+    RG - Recibo
+
+    RE - Estorno ou Recibo de Estorno
+
+    ND - Nota de Débito
+
+    NC - Nota de Crédito
+
+    AF - Factura/Recibo de Autofacturação
+
+    RP - Prémio ou Recibo de Prémio
+
+    RA - Resseguro Aceite
+
+    CS - Imputação a Co-seguradoras
+
+    LD - Imputação a Co-seguradora Líder
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+eacCode
+	
+
+string
+	
+
+“minlength” : 5
+
+“maxlength”: 5
+	
+
+Não
+	
+
+Código de actividade que se relaciona com esta factura (ver Anexo 6.1.)
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+systemEntryDate
+	
+
+string
+	
+
+“format”: “date-time”
+	
+
+Sim
+	
+
+Timestamp de gravação do registo no momento da assinatura - formato ISO 8601 (YYYY-MM-DDThh:mm:ss)
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+customerCountry
+	
+
+string
+	
+
+“minlength” : 2
+
+“maxlength”: 2
+	
+
+Sim
+	
+
+Código de país do comprador, seguindo a norma ISO 3166-1-alpha-2, para compradores domésticos é utilizada a sigla “AO”
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+customerTaxID
+	
+
+string
+	
+
+“minlength” : 1
+
+“maxlength”: 50
+	
+
+Sim
+	
+
+Número de identificação do cliente da factura. Para compradores domésticos (identificados com AO no campo customerCountry) é preenchido com o NIF em Angola.
+Para documentos de facturação de contribuintes domésticos sem identificação do comprador poderá ser utilizado o valor “999999999”.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+companyName
+	
+
+string
+	
+
+“minlength” : 1
+
+“maxlength”: 200
+	
+
+Sim
+	
+
+Nome/denominação do contribuinte.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+lines
+	
+
+array
+	
+
+N/A
+	
+
+Não
+	
+
+Array com a lista de artigos do documento de facturação (object document), sendo não preenchido para os tipos de factura (documentType):
+
+    AR - Aviso de Cobrança/Recibo
+
+    RC - Recibo Emitido
+
+    RG - Outros Recibos Emitidos
+
+Este elemento é obrigatoriamente preenchido para os demais tipos de documentos de facturação
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+paymentReceipt
+	
+
+object
+	
+
+N/A
+	
+
+Não
+	
+
+Object com os dados do recibo, sendo obrigatoriamente preenchido para os tipos de factura (documentType):
+
+    AR - Aviso de Cobrança/Recibo
+
+    RC - Recibo Emitido
+
+    RG - Outros Recibos Emitidos
+
+Este elemento não é preenchido para os demais tipos de documentos de facturação.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+documentTotals
+	
+
+object
+	
+
+N/A
+	
+
+Sim
+	
+
+Objecto cujos atributos apresentam os totais do documento de facturação.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+withholdingTaxList
+	
+
+array
+	
+
+N/A
+	
+
+Não
+	
+
+Array com a lista de retenções na fonte do documento de facturação (object withHoldingTax).
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Composição (itens) do array lines
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+*Campo 	
+
+*Tipo (JSON) 	
+
+*Atributos 	
+
+*Obrigatório 	
+
+*Descrição
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+line
+	
+
+object
+	
+
+N/A
+	
+
+Sim
+	
+
+Objecto com os dados de uma linha de artigos ou serviços do documento de facturação.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Composição (properties) do object line
+
+Campo 	Tipo (JSON) 	Atributos 	Obrigatório 	Descrição
+
+lineNumber
+	
+
+integer
+	
+
+“minimum” : 1
+	
+
+Sim
+	
+
+Número da linha de artigos do documento de facturação, começando em 1 e incrementando de 1 unidade em cada nova linha.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+productCode
+	
+
+string
+	
+
+“minlength” : 1
+
+“maxlength”: 60
+	
+
+Sim
+	
+
+Código do produto ou serviço.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+productDescription
+	
+
+string
+	
+
+“minlength” : 1
+
+“maxlength”: 200
+	
+
+Sim
+	
+
+Descrição do produto ou serviço.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+quantity
+	
+
+number
+	
+
+“minimum” : 0
+	
+
+Sim
+	
+
+Quantidade, inteira ou decimal.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+unitOfMeasure
+	
+
+string
+	
+
+“minlength” : 1
+
+“maxlength”: 20
+	
+
+Sim
+	
+
+Unidade de medida.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+unitPriceBase
+	
+
+number
+	
+
+“minimum” : 0
+	
+
+Sim
+	
+
+Preço unitário base, sem descontos e sem impostos.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+unitPrice
+	
+
+number
+	
+
+“minimum” : 0
+	
+
+Sim
+	
+
+Preço unitário já deduzido de descontos por linha ou cabeçalho, sem incluir impostos.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+referenceInfo
+	
+
+object
+	
+
+N/A
+	
+
+Não
+	
+
+Objecto detalhando a referência para o documento base para este documento de facturação.
+
+Obrigatório para documentos de facturação do tipo:
+
+    NC, para indicar a factura base aonde se deu a devolução de artigos;
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+debitAmount
+	
+
+number
+	
+
+“minimum” : 0
+	
+
+Não
+	
+
+Montante total para cada linha, excluindo impostos, sendo abatido o valor de descontos, aonde o valor da taxa e/ou o motivo da isenção foi aplicada.
+
+Só um dos campos debitAmount e creditAmount poderá estar preenchido.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+creditAmount
+	
+number
+	
+
+“minimum” : 0
+	
+
+Não
+	
+
+Montante total para cada linha, excluindo impostos, sendo abatido o valor de descontos, aonde o valor da taxa e/ou o motivo da isenção foi aplicada.
+
+Só um dos campos debitAmount e creditAmount poderá estar preenchido.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+taxes
+	
+
+array
+	
+
+N/A
+	
+
+Não
+	
+
+Array de objectos que especificam o(s) imposto(s) calculados para a linha.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+settlementAmount
+	
+
+number
+	
+
+“minimum”: 0
+	
+
+Sim
+	
+
+Valor total de descontos, deve reflectir a proporção do desconto global para essa linha e o desconto específico para a mesma.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Composição (itens) do object referenceInfo
+
+
+*Campo 	
+
+*Tipo (JSON) 	
+
+*Atributos 	
+
+*Obrigatório 	
+
+*Descrição
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+reference
+	
+
+string
+	
+
+“minlength” : 1
+
+“maxlength”: 60
+	
+
+Sim
+	
+
+Referência do documento de facturação origem a que este artigo se refere.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+reason
+	
+
+string
+	
+
+“maxlength”: 60
+	
+
+Não
+	
+
+Motivo de intervenção no documento origem.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Composição (properties) do array taxes
+
+*Campo 	
+
+*Tipo (JSON) 	
+
+*Atributos 	
+
+*Obrigatório 	
+
+*Descrição
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+taxType
+	
+
+string
+	
+
+“minlength” : 2
+
+“maxlength”: 3
+	
+
+Sim
+	
+
+Sistema de imposto, com os seguintes valores possíveis e significados:
+
+    IVA - Imposto s/ o Valor Acrescentado;
+
+    IS - Imposto de Selo;
+
+    IEC - Imposto Especial de Consumo;
+
+    NS - Não sujeito a IVA, IS ou IEC.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+taxCountryRegion
+	
+
+string
+	
+
+“minlength” : 2
+
+“maxlength”: 6
+	
+
+Sim
+	
+
+Código de País ou Região do Imposto.
+Quando se refere a um país utiliza um código ISO 3166-1-alpha-2.
+
+Quando se refere à região de Cabinda (único valor possível diferente de códigos de países) deverá utilizar o valor “AO-CAB”.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+taxCode
+	
+
+string
+	
+
+“minlength” : 2
+
+“maxlength”: 10
+	
+
+Não
+	
+
+Código de imposto, de preenchimento obrigatório dependendo do valor preenchido no campo taxType, assumindo os seguintes valores possíveis e significados:
+
+Se taxType = IVA:
+
+    NOR - Taxa normal
+
+    INT – Taxa intermédia
+
+    RED – Taxa reduzida
+
+    ISE - Isento
+
+    OUT – Outra
+
+Se taxType = IS:
+
+    Preenchido opcionalmente com a verba de IS, ver valores possíveis no anexo 6.3.
+
+    ISE – Isento
+
+Se taxType = IEC:
+
+    Preenchido opcionalmente, quando preenchido deverá ter o código pautal para aplicação de IEC, ver valores possíveis no anexo 6.2.
+
+    ISE – Isento
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+taxBase
+	
+
+number
+	
+
+“minimum”: 0
+	
+
+Não
+	
+
+Valor tributável unitário, sendo gerado quando o montante a constar na linha se refere unicamente a imposto, i.e., a base tributável subjacente à determinação desse imposto não constitui receita do sujeito passivo (poderá não fazer parte dos campos debitAmount ou creditAmount).
+
+Exemplos:
+
+    Emitir um documento rectificativo de factura, seja ele uma nota de débito ou crédito, por a taxa de imposto mencionada na factura se encontrar incorrecta e não existindo a possibilidade ou intenção de proceder à anulação desta ou de se efectuar o seu estorno integral, ter-se-á de liquidar ou devolver o imposto, respectivamente, em falta ou em excesso.
+
+    Nas situações de concessão de crédito por instituições mutuantes com o encargo de liquidar Imposto do Selo pelo crédito concedido, a base considerada para a liquidação desse imposto não constitui sua receita pelo que essa base deverá constar no campo TaxBase.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+taxPercentage
+	
+
+number
+	
+
+“minimum”: 0
+	
+
+Não
+	
+
+Taxa a aplicar em percentagem (exemplo: 14 representa a taxa de 14%). Deverá ser preenchida com 0 no caso de isenção ou não sujeição.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+taxAmount
+	
+
+number
+	
+
+“minimum”: 0
+	
+
+Não
+	
+
+Valor fixo da verba de IS, concorre após multiplicado pela quantidade (quantity) para o valor de imposto total da linha do documento de facturação.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+taxContribution
+	
+
+number
+	
+
+“minimum”: 0
+	
+
+Não
+	
+
+Valor calculado de imposto para esta linha de impostos (valor decimal com um máximo de 2 casas decimais) contribuindo para o total de impostos do documento de facturação.
+
+O valor calculado neste campo deverá ser arredondado por excesso para o cêntimo seguinte, tal como ilustram os exemplos:
+
+#Cálculo		#Valor do taxContribution
+
+23,144		23,15
+
+0,001844		0,01
+
+5,9999999		6,00
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+taxExemptionCode
+	
+
+string
+	
+
+“minlength”: 3 “maxlength”: 3
+	
+
+Não
+	
+
+Código de motivo de isenção do imposto. Campo deverá ser preenchido sempre que campo taxCode assumir o valor “ISE” (isento), sendo nesse caso de preenchimento obrigatório.
+
+Quando for preenchido o taxType = “NS” (Não sujeito a IVA, IS ou IEC, deverá também ser preenchido obrigatoriamente.
+
+Quando preenchido assume um dos valores constantes no anexo 6.4 (IVA), 6.5 (IS) ou 6.6 (IEC).
+Composição (properties) do object paymentReceipt
+Campo 	Tipo (JSON) 	Atributos 	Obrigatório 	Descrição
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+sourceDocuments
+	
+
+array
+	
+
+N/A
+	
+
+Sim
+	
+
+Dados do documento de facturação pago.
+Composição (itens) do array sourceDocumentList
+Campo 	Tipo (JSON) 	Atributos 	Obrigatório 	Descrição
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+lineNo
+	
+
+integer
+	
+
+“minimum” : 1
+	
+
+Sim
+	
+
+Número da linha do documento de facturação que foi incluída no recibo, iniciando em 1 e incrementando de 1 unidade em cada nova linha.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+sourceDocumentID
+	
+
+object
+	
+
+N/A
+	
+
+Sim
+	
+
+Dados do documento de facturação que foi incluído neste recibo.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+debitAmount
+	
+
+number
+	
+
+“minimum” : 0
+	
+
+Não
+	
+
+Valor do recibo do documento rectificativo que resultou da lista de documentos sem
+
+impostos e eventuais descontos.
+
+Um e um só dos campos debitAmount e creditAmount poderá estar preenchido.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+creditAmount
+	
+
+number
+	
+
+“minimum” : 0
+	
+
+Não
+	
+
+Valor do recibo da factura ou documento rectificativo, sem impostos e eventuais descontos.
+
+Um e um só dos campos debitAmount e creditAmount poderá estar preenchido.
+Composição (itens) do object sourceDocumentID
+Campo 	Tipo (JSON) 	Atributos 	Obrigatório 	Descrição
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+OriginatingON
+	
+
+string
+	
+
+“minlength” : 1
+
+“maxlength”: 60
+	
+
+Sim
+	
+
+Número do documento de facturação regularizado.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+documentDate
+	
+
+string
+	
+
+“format”: “date”
+	
+
+Sim
+	
+
+Data de emissão da factura ou documento rectificativo desta a que se refere o pagamento.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Composição (properties) do object documentTotals
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+*Campo 	
+
+*Tipo (JSON) 	
+
+*Atributos 	
+
+*Obrigatório 	
+
+*Descrição
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+taxPayable
+	
+
+number
+	
+
+N/A
+	
+
+Sim
+	
+
+Valor total de imposto devido (soma de imposto das linhas).
+
+Quando se trata de um documento de facturação dos tipos:
+
+    AR - Aviso de Cobrança/Recibo;
+
+    RC - Recibo Emitido;
+
+    RG - Outros Recibos emitidos.
+
+Este valor deverá ser apurado somando os valores taxPayable dos diferentes documentos origem regularizados pelo recibo, sendo as NC contabilizadas com sinal negativo.
+
+Este campo não poderá conter valores decimais com mais do que 2 casas decimais.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+netTotal
+	
+
+number
+	
+
+N/A
+	
+
+Sim
+	
+
+Valor total do documento sem imposto
+
+Quando se trata de um documento de facturação dos tipos:
+
+    AR - Aviso de Cobrança/Recibo;
+
+    RC - Recibo Emitido;
+
+    RG - Outros Recibos emitidos.
+
+Este valor é apurado somando os valores netTotal dos diferentes documentos origem regularizados pelo recibo, sendo as NC contabilizadas com sinal negativo.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+grossTotal
+	
+
+number
+	
+
+N/A
+	
+
+Sim
+	
+
+Soma do valor total sem imposto e do valor total de imposto devido.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+currency
+	
+
+object
+	
+
+N/A
+	
+
+Não
+	
+
+Objecto destinado a guardar a informação da divisa em que se processa o pagamento da factura, não preenchido se divisa for AOA. Passa a preenchimento obrigatório caso divisa diferente de AOA.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Composição (properties) do object currency
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+*Campo 	
+
+*Tipo (JSON) 	
+
+*Atributos 	
+
+*Obrigatório 	
+
+*Descrição
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+currencyCode
+	
+
+string
+	
+
+“minlength” : 3
+
+“maxlength”: 3
+	
+
+Sim
+	
+
+Código da divisa utilizada para pagar a factura, segundo norma ISO 4217 (excluindo AOA).
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+currencyAmount
+	
+
+number
+	
+
+“exclusiveMinimum” : 0
+	
+
+Sim
+	
+
+Valor total na moeda estrangeira.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+exchangeRate
+	
+
+number
+	
+
+“exclusiveMinimum” : 0
+	
+
+Sim
+	
+
+Taxa de câmbio para AOA.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Composição (itens) do array withholdingTaxList
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+*Campo 	
+
+*Tipo (JSON) 	
+
+*Atributos 	
+
+*Obrigatório 	
+
+*Descrição
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+withholdingTaxType
+	
+
+string
+	
+
+"maxLength": 3
+	
+
+Sim
+	
+
+Código de tipo de retenção na fonte ou de cativação, assumindo os seguintes valores possíveis e significados:
+
+    IRT - Imposto Sobre os Rendimentos do Trabalho;
+
+    II - Imposto Industrial;
+
+    IS - Imposto de Selo;
+
+    IVA - Imposto s/ o Valor Acrescentado;
+
+    IP - Imposto Predial;
+
+    IAC - Imposto sobre Aplicação de Capitais;
+
+    OU - Outros;
+
+    IRPC - Imposto s/ rendimento de pessoas colectivas (impostos futuros);
+
+    IRPS - Imposto s/ rendimento de pessoas singulares (impostos futuros).
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+withholdingTaxDescription
+	
+
+string
+	
+
+"maxLength": 120
+	
+
+Não
+	
+
+O motivo de retenção na fonte. Devem ser indicadas as disposições legais aplicáveis ou a percentagem de imposto aplicável.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+withholdingTaxAmount
+	
+
+number
+	
+
+N/A
+	
+
+Sim
+	
+
+Valor de retenção na fonte.
+
+Quando se trata de um documento de facturação de um dos tipos:
+
+    AR - Aviso de cobrança/recibo
+
+    RC - Recibo emitido
+
+    RG - Outros recibos emitidos
+
+Este valor é apurado agrupando os valores withholdingTaxAmount, para o mesmo tipo de imposto (withholdingTaxType) dos diferentes documentos origem regularizados pelo recibo, sendo as NC contabilizadas com sinal negativo.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Parâmetros de saída (POST)
+
+*HTTP code 	
+
+*Tipo (JSON) 	
+
+*Descrição
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+200
+	
+
+string
+
+requestID
+	
+
+Registo de pedido efectuado com sucesso sendo devolvido ID de confirmação de solicitação de registo de documentos de facturação – a validação será efectuada de forma diferida no tempo.
+
+Atributos da string requestID: “maxlength”: 15
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+400
+	
+
+array
+
+errorList
+	
+
+Registo de pedido efectuado com erros, sendo devolvida uma lista de erros na recepção dos dados do pedido de registo dos documentos de facturação.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Códigos e mensagens de erro no retorno do Serviço
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Tendo em conta as regras de negócio, são propostos os seguintes erros de validação:
+
+*Regra de negócio 	
+
+
+*Código de erro 	
+
+
+*Descrição de erro
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-001
+
+FE-RNG-002
+	
+
+E01
+	
+
+Falta de parâmetro <parâmetro>
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+FE-RNG-003
+	
+
+E02
+	
+
+Formato inválido do parâmetro <parâmetro> (<valor do parâmetro>).
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+FE-RNG-004
+	
+
+E03
+	
+
+Valor não esperado do parâmetro <parâmetro> (<valor do parâmetro>).
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-005
+	
+
+E04
+	
+
+Número de facturas especificado no parâmetro “numberOfEntries” (<valor de numberOfEntries>) não coincide com o número de ocorrências do array “documents” (<nº de ocorrências de documents>).
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-006
+	
+
+E05
+	
+
+Número fiscal do emissor especificado no parâmetro <parâmetro> (<valor do parâmetro>) não possui actividade registada no sistema da AGT.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-008
+	
+
+E06
+	
+
+A data de criação do pedido especificado no parâmetro “creationDate” (<valor do parâmetro>) não está dentro do período permitido.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-009
+	
+
+E07
+	
+
+Software de facturação especificado no parâmetro “softwareValidationNo” (<valor do parâmetro>) não está certificado
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-010
+	
+
+E08
+	
+
+A assinatura do Produtor de Software “jwsSoftwareSignature” não está de acordo com a informação transmitida.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-011
+	
+
+E39
+	
+
+Os dados constantes na assinatura do Produtor de Software “jwsSoftwareSignature” não estão de acordo com a informação constante no processo de Certificação do Software.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-012
+	
+
+E09
+	
+
+Factura especificada no parâmetro <parâmetro> (<valor do parâmetro>) já consta no repositório do sistema
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-013
+	
+
+E10
+	
+
+Incorrecta especificação do contribuinte no preenchimento dos parâmetros “customerTaxID” (<valor do parâmetro>), “taxIDNumber” (<valor do parâmetro>) e “taxIDCountry” (<valor do parâmetro>)
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-014
+	
+
+E11
+	
+
+Número fiscal Angolano especificado no parâmetro <parâmetro> (<valor do parâmetro>) é desconhecido no sistema da AGT.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-015
+	
+
+E12
+	
+
+Incorrecto número de linha de artigo na factura preenchido no parâmetro “lineNo” (<valor do parâmetro>) originando repetição ou quebra de sequência
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-016
+	
+
+E13
+	
+
+É esperado documento de facturação de referência para a factura transmitida que não foi especificado no parâmetro “referenceInfo”
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-017
+	
+
+E14
+	
+
+Documento de referência preenchido no parâmetro “reference” (<valor do parâmetro>) é desconhecido do sistema.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-018
+	
+
+E15
+	
+
+Não podem ser especificados em simultâneo os parâmetros <parâmetro1> (<valor do parâmetro1>) e <parâmetro2> (<valor do parâmetro2>).
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-019
+	
+
+E16
+	
+
+A soma dos valores a crédito para as diferentes linhas de um documento de facturação deve ser obrigatoriamente inferior à soma dos valores a débito quando se trata de uma nota de crédito.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-020
+	
+
+E17
+	
+
+A soma dos valores a crédito para as diferentes linhas de um documento de facturação deve ser obrigatoriamente superior à soma dos valores a débito quando se trata de um documento diferente de nota de crédito.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-021
+	
+
+E18
+	
+
+Combinação não permitida dos campos <parâmetro1> (<valor do parâmetro1>), <parâmetro2> (<valor do parâmetro2>), <parâmetro3> (<valor do parâmetro3>), <parâmetro4> (<valor do parâmetro4>).
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-022
+	
+
+E19
+	
+
+O campo “taxBase” (<valor do parâmetro>) não pode estar especificado simultaneamente com um dos campos “debitAmount” (<valor do parâmetro>) ou “creditAmount” (<valor do parâmetro>).
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-023
+	
+
+E20
+	
+
+Combinação não permitida dos campos <parâmetro1> (<valor do parâmetro1>), <parâmetro2> (<valor do parâmetro2>)
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-024
+	
+
+E21
+	
+
+Valor do campo <parâmetro1> (<valor do parâmetro1>) não coincide com a aplicação da fórmula: quantity * unitPriceBase
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-025
+	
+
+E22
+	
+
+Valor total de impostos da factura “taxPayable” (<valor do parâmetro>), não corresponde à soma dos impostos de todas as linhas (<total calculado>)
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-026
+	
+
+E23
+	
+
+Valor total do documento sem impostos “netPayable” (<valor do parâmetro>), não corresponde à soma dos valores sem impostos de todas as linhas (<total calculado>)
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-027
+	
+
+E24
+	
+
+Valor total do documento com impostos “grossPayable” (<valor do parâmetro>), não corresponde à soma dos valores com impostos de todas as linhas (<total calculado>)
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-028
+	
+
+E25
+	
+
+Valor registado na factura no campo “grossTotal” não corresponde ao valor na divisa utilizada no pagamento (<valor do parâmetro>) ao câmbio da divisa (<valor do parâmetro>)
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-029
+	
+
+E26
+	
+
+Utilização incorrecta do campo “lines” para o tipo de factura (<valor do parâmetro>)
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+	
+
+E27
+	
+
+Utilização incorrecta do campo “paymentReceipt” para o tipo de factura (<valor do parâmetro>)
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-007
+	
+
+E28
+	
+
+Número fiscal do emissor especificado no parâmetro <parâmetro> (<valor do parâmetro>) não aderiu à facturação electrónica no sistema da AGT.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-030
+	
+
+E29
+	
+
+A data de emissão do documento de facturação “documentDate” (<valor do parâmetro>) é anterior à data de adesão do contribuinte à facturação electrónica (<data de adesão>).
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-031
+	
+
+E40
+	
+
+Os dados constantes na assinatura da chamada do serviço “jwsSignature” não estão de acordo com a informação constante na chamada do serviço.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-061
+	
+
+E41
+	
+
+A soma dos valores a regularizar assinalados nos campos “debitAmount”/”creditAmount” (<valor do parâmetro>) para o documento dado em “OriginatingON”(<valor do parâmetro>) excede o montante remanescente do referido documento.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-068
+	
+
+E42
+	
+
+A soma dos valores a anular/devolver assinalada no campo “debitAmount”/”creditAmount” (<valor do parâmetro>) para o mesmo documento base dado em “reference”(<valor do parâmetro>) excede o montante ainda não anulado/devolvido do referido documento.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-069
+	
+
+E43
+	
+
+Quantidade de artigos/serviços assinalados no campo “quantity” (<valor do parâmetro>) deverá ser zero para aplicações de correcções com o campo “taxBase” (<valor do parâmetro>).
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-073
+	
+
+E46
+	
+
+A emissão de documentos com o mesmo número de identificação no campo documentNo (<valor do parâmetro>) de outro documento previamente enviado e rejeitado pela AGT não é aceite. As correcções de documentos rejeitados deverão ser efectuados com a utilização de um novo número de documento.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+Adicionalmente poderão ocorrer os seguintes erros não funcionais:
+
+*Código de erro 	
+
+*Descrição de erro
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+E99
+	
+
+Outro erro não detalhado <parâmetro> (<valor do parâmetro>)
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+Nota: O registo de uma factura para validação através deste serviço obriga a uma validação preliminar do formato da informação recebida, para a qual se dá resposta imediata, sendo a validação completa dos dados das facturas efectuada de forma diferida no tempo, de acordo com a capacidade e programação dos processamentos batch.
+
+
+
+4.4: Consultar Estado da Fatura
+
+
+Serviço destinado a obter o estado de validação das facturas previamente transmitidas através do serviço registarFactura, devolvendo em resposta um indicador de sucesso ou insucesso na obtenção da informação, bem como o estado de cada uma das facturas incluídas na solicitação.
+Características do Serviço
+
+POST obter estado
+
+POST https://sifphml.minfin.gov.ao/sigt/fe/v1/obterEstado
+
+Exemplo do Pedido(Payload)
+
+ {
+    "schemaVersion": "1.2",
+    "submissionUUID": "a1b2c3d4-e5f6-7890-g1h2-i238j234k5122",
+    "taxRegistrationNumber": "5001636863",
+    "submissionTimeStamp": "2025-09-02T14:30:00Z",
+    "softwareInfo": {
+        "softwareInfoDetail": {
+            "productId": "Meu ERP CERTO",
+            "productVersion": "1.0.1",
+            "softwareValidationNumber": "C_134"
+        },
+        "jwsSoftwareSignature": "eyJ0eXAiOiJKT1NFIiwiYWxnIjoiUlMyNTYifQ.eyJwcm9kdWN0SWQiOiJNZXUgRVJQIENFUlRPIiwicHJvZHVjdFZlcnNpb24iOiIxLjAuMSIsInNvZnR3YXJlVmFsaWRhdGlvbk51bWJlciI6IkNfMTM0In0.VE3zkvOJOpqBfz4wpx4KCgcwOGgzGUP3MSMbaHCDnHhwOaeA6jlccBW9HjgQvg2tYCVVq0imrU_z0grEHNthhG4xD3afSOD1_RzvHs8Tc45dvztHJzB4gF0CAX-yIDwi7XcHiMRY0vkXOETBeHKewg0ktWSnZ7SLf4GxGzE7ry2u_pmhqhCPhxpa0oGQ_rBJUYkEAFg1OwaqjwvzCFgdT11r-XsHmnkcfJX_ktj59RWR_zgbytiCRtwCK9LNUflveS5GzUaCXbPn2deQ3F2hPldLECEa_ahwoapoK1LhkgOAVyPLJf6M1Cm09Le7rkdSaWQSW5BI_sPx5YaUaXkeqg"
+    },
+    "requestID": "202500000000118"
+ }
+
+Payload assinatura Consultar Estado
+
+ {
+    "taxRegistrationNumber": "...",
+    "requestID": "..."
+ }
+
+Exemplo da Resposta(Payload)
+
+ {
+    "requestID": "202500000000118",
+    "resultCode": "2",
+    "taxRegistrationNumber": "5001636863",
+    "documentStatusList": [],
+    "requestErrorList": []
+ }
+
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+Parâmetros de entrada
+
+*Campo 	
+
+*Tipo (JSON) 	
+
+*Atributos 	
+
+*Obrigatório 	
+
+*Descrição
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+schemaVersion
+	
+
+string
+	
+
+N/A
+	
+
+Sim
+	
+
+Versão do schema do serviço, exemplo “1.0”
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+taxRegistrationNumber
+	
+
+string
+	
+
+“maxlength”: 15
+	
+
+Sim
+	
+
+Número fiscal de contribuinte.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+submissionTimeStamp
+	
+
+string
+	
+
+N/A
+	
+
+Sim
+	
+
+Timestamp de submissão do pedido no formato ISO 8601, exemplos:
+
+    "2025-05-27T14:30:00Z" (em UTC)
+
+    "2025-05-27T14:30:00-03:00" (com informação de timezone)
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+softwareInfo
+	
+
+object
+	
+
+N/A
+	
+
+Sim
+	
+
+Objecto com os dados do Software de Facturação
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+jwsSignature
+	
+
+string
+	
+
+“minlength” : 256
+
+“maxlength”: 256
+	
+
+Sim
+	
+
+Assinatura digital da solicitação usando a chave privada do emissor através do algoritmo RS256 (RSA + SHA-256). Os campos a serem utilizados na assinatura são:
+
+    taxRegistrationNumber
+
+    requestID
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+requestID
+	
+
+string
+	
+
+“maxlength”: 15
+	
+
+Sim
+	
+
+Identificador do pedido de registo de documentos de facturação, valor obtido quando ocorreu com sucesso a chamada ao serviço registarFactura.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Parâmetros de Saída
+
+*HTTP code 	
+
+*Tipo (JSON) 	
+
+*Descrição
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+200
+	
+
+object
+
+statusResult
+	
+
+Registo de pedido efectuado com sucesso sendo devolvido um object do tipo statusResult com o ponto de situação do processo de validação das facturas enviadas.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+422
+	
+
+Object errorEntry
+	
+
+Chamada ocorreu com erro, sendo enviado uma mensagem (código e descrição) correspondente ao erro “E96” - “erro na chamada, solicitação ainda em processamento”
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+422
+	
+
+Object errorEntry
+	
+
+Chamada ocorreu com erro, sendo enviado uma mensagem (código e descrição) correspondente ao erro “E97” - “erro na chamada, solicitação prematura”
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+422
+	
+
+Object errorEntry
+	
+
+Chamada ocorreu com erro, sendo enviado uma mensagem (código e descrição) correspondente ao erro “E95” - “erro na chamada, NIF emissor diferente”
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+429
+	
+
+Object errorEntry
+	
+
+Chamada ocorreu com erro, sendo enviado uma mensagem (código e descrição) correspondente ao erro “E98” - “erro na chamada, demasiadas solicitações repetidas”
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+400
+	
+
+Object errorEntry
+	
+
+Chamada ocorreu com erro, sendo enviado uma mensagem (código e descrição) correspondente ao erro “E96” - “solicitação mal efectuada – erro de estrutura”
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Composição (properties) do object statusResult
+
+*Campo 	
+
+*Tipo (JSON) 	
+
+*Atributos 	
+
+*Obrigatório 	
+
+*Descrição
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+requestID
+	
+
+string
+	
+
+“maxlength”: 15
+	
+
+Sim
+	
+
+Identificador do pedido de registo de documentos de facturação que se pretende consultar (enviado como parâmetro na chamada).
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+resultCode
+	
+
+integer
+	
+
+N/A
+	
+
+Sim
+	
+
+Resultado do processamento da solicitação de registo de facturas, com os seguintes valores possíveis e significados:
+
+    0 - Processamento concluído, sem facturas inválidas;
+
+    1 - Processamento concluído, com facturas válidas e facturas inválidas;
+
+    2 - Processamento concluído, sem facturas válidas;
+
+    7 - Solicitação não respondida por ser prematura ou repetitiva, devendo aguardar período mínimo para repetir este pedido;
+
+    8 - Processamento ainda em curso;
+
+    9 - Processamento cancelado.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+documentStatusList
+	
+
+array
+	
+
+N/A
+	
+
+Não
+	
+
+Array com os resultados do processamento de cada uma das facturas constantes no pedido de registo de facturas, sendo obrigatório quando resultCode for diferente de 7, 8 ou 9.
+
+Terá uma linha para cada nº de factura que constava no pedido de registo solicitado.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Composição (itens) do array documentStatusList
+
+*Campo 	
+
+*Tipo (JSON) 	
+
+*Atributos 	
+
+*Obrigatório 	
+
+*Descrição
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+documentNo
+	
+
+string
+	
+
+“minlength” : 1
+
+“maxlength”: 60
+	
+
+Sim
+	
+
+Identificação única do documento.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+documentStatus
+	
+
+string
+	
+
+“minlength”: 1
+
+“maxlength”: 1
+	
+
+Sim
+	
+
+Resultado do processamento da factura identificada no campo documentNo, com os seguintes valores possíveis e significados:
+
+    V - Factura válida;
+
+    I - Factura inválida.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+errorList
+	
+
+array
+	
+
+N/A
+	
+
+Não
+	
+
+Array com os erros encontrados no processamento do documento de facturação identificado no campo documentNo, sendo obrigatório quando documentStatus for “I”.
+
+Terá uma linha para cada erro encontrado.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Composições (itens) do array errorList e (properties) do object errorEntry
+
+*Campo 	
+
+*Tipo (JSON) 	
+
+*Atributos 	
+
+*Obrigatório 	
+
+*Descrição
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+errorCode
+	
+
+string
+	
+
+“minlength”: 3
+
+“maxlength”: 3
+	
+
+Sim
+	
+
+Código de erro
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+errorDescription
+	
+
+string
+	
+
+“maxlength”: 100
+	
+
+Sim
+	
+
+Descrição do erro
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+#Códigos e mensagens de erro no retorno
+
+Tendo em conta as regras de negócio, são propostos adicionalmente os seguintes erros de validação:
+
+*Regra de negócio 	
+
+*Código de erro 	
+
+
+*Descrição de erro
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-010
+	
+
+E08
+	
+
+A assinatura do Produtor de Software “jwsSoftwareSignature” não está de acordo com a informação transmitida.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+FE-RNG-011
+	
+
+E39
+	
+
+Os dados constantes na assinatura do Produtor de Software “jwsSoftwareSignature” não estão de acordo com a informação constante no processo de Certificação do Software.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+FE-RNG-032
+	
+
+E40
+	
+
+Os dados constantes na assinatura da chamada do serviço “jwsSignature” não estão de acordo com a informação constante na chamada do serviço.
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+4.5: Consultar Factura
+
+
+
+Serviço destinado a obter os dados detalhados de uma factura electrónica emitida em nome do contribuinte, devolvendo em resposta o indicador de sucesso ou insucesso na obtenção da informação, bem como o detalhe da factura especificada na solicitação.
+Características do Serviço
+
+POST consultar factura
+POST https://sifphml.minfin.gov.ao/sigt/fe/v1/consultarFactura
+Exemplo do Pedido(Payload)
+
+ {
+    "schemaVersion": "1.2",
+    "submissionUUID": "a1b2c3d4-e5f6-7890-g1h2-i238j234k5122",
+    "taxRegistrationNumber": "5001636863",
+    "submissionTimeStamp": "2025-09-02T14:30:00Z",
+    "softwareInfo": {
+        "softwareInfoDetail": {
+            "productId": "Meu ERP CERTO",
+            "productVersion": "1.0.1",
+            "softwareValidationNumber": "C_134"
+        },
+        "jwsSoftwareSignature": "eyJ0eXAiOiJKT1NFIiwiYWxnIjoiUlMyNTYifQ.eyJwcm9kdWN0SWQiOiJNZXUgRVJQIENFUlRPIiwicHJvZHVjdFZlcnNpb24iOiIxLjAuMSIsInNvZnR3YXJlVmFsaWRhdGlvbk51bWJlciI6IkNfMTM0In0.VE3zkvOJOpqBfz4wpx4KCgcwOGgzGUP3MSMbaHCDnHhwOaeA6jlccBW9HjgQvg2tYCVVq0imrU_z0grEHNthhG4xD3afSOD1_RzvHs8Tc45dvztHJzB4gF0CAX-yIDwi7XcHiMRY0vkXOETBeHKewg0ktWSnZ7SLf4GxGzE7ry2u_pmhqhCPhxpa0oGQ_rBJUYkEAFg1OwaqjwvzCFgdT11r-XsHmnkcfJX_ktj59RWR_zgbytiCRtwCK9LNUflveS5GzUaCXbPn2deQ3F2hPldLECEa_ahwoapoK1LhkgOAVyPLJf6M1Cm09Le7rkdSaWQSW5BI_sPx5YaUaXkeqg"
+    },
+    "jwsSignature": "string",
+    "invoiceNo": "FT FT6325S2C/1000020"
+ }
+
+Payload assinatura Consultar Factura
+
+ {
+    "taxRegistrationNumber": "...",
+    "documentNo": "..."
+ }
+
+Payload de Saída(resposta)
+
+ {
+    "documentNo": "",
+    "documentStatus": "",
+    "document": "",
+    "documentStatusList": [""],
+    "errorList": [
+        {
+            "idError": "E93",
+            "descriptionError": "Documento desconhecido (FT FT6325S2C/1000020)"
+        }
+    ]
+ }
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Parâmetros de entrada
+
+*Campo 	
+
+*Tipo (JSON)  	
+
+*Atributos 	
+
+*Obrigatório  	
+
+*Descrição
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+schemaVersion
+	
+
+string
+	
+
+N/A
+	
+
+Sim
+	
+
+Versão do schema do serviço, exemplo “1.0”.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+taxRegistrationNumber
+	
+
+string
+	
+
+“maxlength”: 15
+	
+
+Sim
+	
+
+Número fiscal de contribuinte.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+submissionTimeStamp
+	
+
+string
+	
+
+N/A
+	
+
+Sim
+	
+
+Timestamp de submissão do pedido no formato ISO 8601. Exemplos:
+
+    "2025-05-27T14:30:00Z" (em UTC);
+
+    "2025-05-27T14:30:00-03:00" (com informação de timezone).
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+softwareInfo
+	
+
+object
+	
+
+N/A
+	
+
+Sim
+	
+
+Objecto com os dados do Software de Facturação
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+jwsSignature
+	
+
+string
+	
+
+“minlength” : 256
+
+“maxlength”: 256
+	
+
+Sim
+	
+
+Assinatura digital da solicitação usando a chave privada do emissor através do algoritmo RS256 (RSA + SHA-256). Os campos a serem utilizados na assinatura são:
+
+    taxRegistrationNumber;
+
+    documentNo.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+documentNo
+	
+
+string
+	
+
+“maxlength”: 60
+	
+
+Sim
+	
+
+Identificador da factura electrónica que se pretende consultar.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Parâmetros de Saída
+
+*HTTP code 	
+
+*Tipo (JSON)  	
+
+*Descrição
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+200
+	
+
+object
+
+statusResult
+	
+
+Registo de pedido efectuado com sucesso sendo devolvido um object do tipo statusFEResult com os dados da factura pesquisada.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+400
+	
+
+array
+
+errorList
+	
+
+Registo de pedido efectuado com erros, sendo devolvida uma lista de erros na recepção dos dados do pedido de registo dos documentos de facturação.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+422
+	
+
+Object errorEntry
+	
+
+Chamada ocorreu com erro, sendo enviado uma mensagem (código e descrição) correspondente ao erro “E94” - “erro na chamada, nif diferente”
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+429
+	
+
+Object errorEntry
+	
+
+Chamada ocorreu com erro, sendo enviado uma mensagem (código e descrição) correspondente ao erro “E98” - “erro na chamada, demasiadas solicitações repetidas”
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+400
+	
+
+Object errorEntry
+	
+
+Chamada ocorreu com erro, sendo enviado uma mensagem (código e descrição) correspondente ao erro “E93” - “documento desconhecido”
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Composição (properties) do object statusFEResult
+
+
+*Campo 	
+
+*Tipo (JSON) 	 
+
+*Atributos 	
+
+*Obrigatório  	
+
+*Descrição
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+documentNo
+	
+
+string
+	
+
+“maxlength”: 60
+	
+
+Sim
+	
+
+Identificador da factura electrónica que se pretende consultar (enviado como parâmetro na chamada).
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+validationStatus
+	
+
+string
+	
+
+“maxlength”: 1
+	
+
+Não
+	
+
+Indicador de validação do documento de facturação solicitado, com os seguintes valores possíveis e significados:
+
+    V - Factura válida;
+
+    P - Factura válida com penalização (enviada com mais de 24h de atraso e sem contingência aprovada pela AGT).
+
+Campo é de preenchimento obrigatório se, para o documento de facturação encontrada, não foi encontrado registo de anulação posterior.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+documents
+	
+
+array
+	
+
+N/A
+	
+
+Sim
+	
+
+Array com o(s) dado(s) da(s) factura(s) electrónica(s) – poderão ser encontrados mais que um resultado se a factura foi anulada após emitida (ver formato em 5.1.2.2) .
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Códigos e mensagens de erro no retorno do Serviço
+
+Tendo em conta as regras de negócio, são propostos adicionalmente os seguintes erros de validação:
+
+*Regra de negócio 	
+
+*Código de erro 	
+
+*Descrição de erro
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-010
+	
+
+E08
+	
+
+A assinatura do Produtor de Software “jwsSoftwareSignature” não está de acordo com a informação transmitida.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-011
+	
+
+E39
+	
+
+Os dados constantes na assinatura do Produtor de Software “jwsSoftwareSignature” não estão de acordo com a informação constante no processo de Certificação do Software.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-032
+	
+
+E40
+	
+
+Os dados constantes na assinatura da chamada do serviço “jwsSignature” não estão de acordo com a informação constante na chamada do serviço.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+Validar Documento
+
+Serviço destinado a transmitir a confirmação ou rejeição de uma factura ou documento equivalente em que o solicitante é indicado como adquirente e definir a percentagem IVA Dedutível a considerar sempre que aplicável.
+Características do Serviço
+
+POST validar documento
+POST https://sifphml.minfin.gov.ao/sigt/fe/v1/validarDocumento
+Payload de entrada para solicitar criação de série
+
+ {
+    "schemaVersion": "1.2",
+    "submissionTimeStamp": "2025-10-28T18:51:10.178Z",
+    "taxRegistrationNumber": "5001636863",
+    "softwareInfo": {
+    "softwareInfoDetail": {
+            "productId": "Meu ERP CERTO",
+            "productVersion": "1.0.1",
+            "softwareValidationNumber": "C_134"
+        },
+        "jwsSoftwareSignature": "eyJ0eXAiOiJKT1NFIiwiYWxnIjoiUlMyNTYifQ.eyJwcm9kdWN0SWQiOiJNZXUgRVJQIENFUlRPIiwicHJvZHVjdFZlcnNpb24iOiIxLjAuMSIsInNvZnR3YXJlVmFsaWRhdGlvbk51bWJlciI6IkNfMTM0In0.VE3zkvOJOpqBfz4wpx4KCgcwOGgzGUP3MSMbaHCDnHhwOaeA6jlccBW9HjgQvg2tYCVVq0imrU_z0grEHNthhG4xD3afSOD1_RzvHs8Tc45dvztHJzB4gF0CAX-yIDwi7XcHiMRY0vkXOETBeHKewg0ktWSnZ7SLf4GxGzE7ry2u_pmhqhCPhxpa0oGQ_rBJUYkEAFg1OwaqjwvzCFgdT11r-XsHmnkcfJX_ktj59RWR_zgbytiCRtwCK9LNUflveS5GzUaCXbPn2deQ3F2hPldLECEa_ahwoapoK1LhkgOAVyPLJf6M1Cm09Le7rkdSaWQSW5BI_sPx5YaUaXkeqg"
+  },
+  "jwsSignature": "string",
+  "documentNo": "FT FT6325S2C/7",
+  "action": "C",
+  "deductibleVATPercentage": "72.5",
+  "nonDeductibleAmount": "200.00"
+ }
+
+Payload assinatura Validar Documento
+
+ {
+    "taxRegistrationNumber": "...",
+    "documentNo": "FT FT6325S2C/7",
+    "action": "C",
+    "deductibleVATPercentage": "72.5",
+    "nonDeductibleAmount": "200.00"
+ }
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Parâmetros de entrada
+
+*Campo 	
+
+*Tipo (JSON)  	
+
+*Atributos 	
+
+*Obrigatório  	
+
+*Descrição
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+schemaVersion
+	
+
+string
+	
+
+N/A
+	
+
+Sim
+	
+
+Versão do schema do serviço, exemplo “1.0”.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+taxRegistrationNumber
+	
+
+string
+	
+
+“maxlength”: 15
+	
+
+Sim
+	
+
+Número fiscal de contribuinte emissor da factura.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+submissionTimeStamp
+	
+
+string
+	
+
+N/A
+	
+
+Sim
+	
+
+Timestamp de submissão do pedido no formato ISO 8601. Exemplos:
+
+    "2025-05-27T14:30:00Z" (em UTC);
+
+    "2025-05-27T14:30:00-03:00" (com informação de timezone).
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+softwareInfo
+	
+
+object
+	
+
+N/A
+	
+
+Sim
+	
+
+Objecto com os dados do Software de Facturação
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+jwsSignature
+	
+
+string
+	
+
+“minlength” : 256
+
+“maxlength”: 256
+	
+
+Sim
+	
+
+Assinatura digital da solicitação usando a chave privada do emissor através do algoritmo RS256 (RSA + SHA-256). Os campos a serem utilizados na assinatura são:
+
+    taxRegistrationNumber - NIF do contribuinte adquirente que pretende validar a factura (só esse NIF terá essa possibilidade junta da AGT)
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+    documentNo.
+
+documentNo
+	
+
+string
+	
+
+“maxlength”: 60
+	
+
+Sim
+	
+
+Identificador do documento de facturação que se pretende confirmar/rejeitar.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+action
+	
+
+string
+	
+
+“minlength” : 1
+
+“maxlength”: 1
+	
+
+Sim
+	
+
+Acção que o adquirente pretende aplicar ao documento de facturação emitido, com os seguintes valores possíveis e significados:
+
+    C – Confirmação do documento
+
+    R – Rejeição do documento
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+deductibleVATPercentage
+	
+
+number
+	
+
+“minimum”: 0
+
+“maximum”: 100
+	
+
+Não
+	
+
+Percentagem de IVA dedutível a considerar para o documento em análise sendo utilizado quando action for “C” (confirmação do documento) e o tipo de documento não for considerado recibo nem nota de crédito. Caso este campo não esteja preenchido será considerado que o contribuinte não tem direito a dedução.
+
+Só um dos campos deductibleVATPercentage e nonDeductibleAmount poderá estar preenchido.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+nonDeductibleAmount
+	
+
+number
+	
+
+“minimum”: 0
+	
+
+Não
+	
+
+Valor do documento que não é sujeito a dedução de IVA. Este campo deve ser preenchido sempre que parte do montante da fatura não possa ser deduzido pelo contribuinte (ex.: despesas não dedutíveis fiscalmente, limites legais ou situações específicas previstas na legislação). Caso este campo não seja preenchido, será considerado que a totalidade do valor do documento é dedutível.
+
+Só um dos campos deductibleVATPercentage e nonDeductibleAmount poderá estar preenchido.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Parâmetros de Saída
+
+*HTTP code 	
+
+*Tipo (JSON)  	
+
+*Descrição
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+200
+	
+
+object
+
+confirmRejectResult
+	
+
+Registo de pedido efectuado com sucesso sendo devolvido um object do tipo statusFEResult com os dados da factura pesquisada.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+422
+	
+
+Object errorEntry
+	
+
+Chamada ocorreu com erro, sendo enviado uma mensagem (código e descrição) correspondente ao erro “E94” - “erro na chamada, nif diferente”
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+400
+	
+
+Object errorEntry
+	
+
+Chamada ocorreu com erro, sendo enviado uma mensagem (código e descrição) correspondente ao erro “E96” - “solicitação mal efectuada – erro de estrutura”
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Composição (properties) do object confirmRejectResult
+
+*Campo 	
+
+*Tipo (JSON)  	
+
+*Atributos 	
+
+*Obrigatório  	
+
+*Descrição
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+actionResultCode
+	
+
+string
+	
+
+“minlength” : 4
+
+“maxlength”: 5
+	
+
+Sim
+	
+
+Código de resultado da solicitação, com os seguintes valores possíveis e significados:
+
+    C_OK – Confirmação do documento com sucesso
+
+    R_OK – Rejeição do documento com sucesso
+
+    C_NOK – Confirmação do documento não possível
+
+    R_NOK – Rejeição do documento não possível
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+documentStatusCode
+	
+
+string
+	
+
+“minlength” : 3
+
+“maxlength”: 4
+	
+
+Sim
+	
+
+Código de estado em que o documento a actualizar foi encontrado antes de tentada a realização desta acção, com os seguintes valores possíveis e significados:
+
+    S_A – Anulado
+
+    S_C – Confirmado
+
+    S_I – Inválido
+
+    S_RG – Registado
+
+    S_RJ – Rejeitado
+
+    S_V – Válido
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+errorList
+	
+
+array
+	
+
+N/A
+	
+
+Não
+	
+
+Array com os erros encontrados que impediram a execução com sucesso da acção solicitada (confirmação ou rejeição do documento) sobre o documento de facturação identificado no campo documentNo, sendo obrigatório quando actionResultCode for “C_NOK” ou “R_NOK”.
+
+Terá uma linha para cada erro encontrado.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Composições (itens) do array errorList e (properties) do object errorEntry
+
+*Campo 	
+
+*Tipo (JSON)  	
+
+*Atributos 	 
+
+*Obrigatório  	
+
+*Descrição
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+errorCode
+	
+
+string
+	
+
+“minlength”: 3
+
+“maxlength”: 3
+	
+
+Sim
+	
+
+Código de erro
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+errorDescription
+	
+
+string
+	
+
+“maxlength”: 100
+	
+
+Sim
+	
+
+Descrição do erro
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Códigos e mensagens de erro no retorno do Serviço
+
+Tendo em conta as regras de negócio, são propostos adicionalmente os seguintes erros de validação:
+
+*Regra de negócio 	
+
+*Código de erro 	
+
+*Descrição de erro
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-033
+	
+
+E44
+	
+
+O estado do documento de facturação não permite a acção de confirmação do documento pelo adquirente.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-034
+	
+
+E45
+	
+
+O estado do documento de facturação não permite a acção de rejeição do documento pelo adquirente.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+FE-RNG-077
+	
+
+E47
+	
+
+O campo “deductibleVATPercentage” (<valor do parâmetro>) não pode estar especificado simultaneamente com o campo “nonDeductibleAmount” (<valor do parâmetro>).
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+5. Modelo de Processamento Assíncrono
+
+
+Modelo de Processamento Assíncrono
+
+A submissão de documentos fiscais na API segue um modelo assíncrono, garantindo escalabilidade, resiliência e alta capacidade de processamento.
+
+Fluxo geral:
+
+    O contribuinte/submissor envia o documento usando o endpoint
+    Registar Factura Eletrónica.
+
+    A API valida apenas a estrutura JSON.
+
+    Se a estrutura estiver correta, o documento é colocado numa fila de processamento.
+
+    A API devolve imediatamente:
+
+        requestID
+
+    O documento é processado internamente:
+
+        Validações fiscais
+
+        Regras tributárias
+
+        Validação da série
+
+        Verificação de integridade
+
+    O produtor volta mais tarde para consultar o estado via
+    Consultar Estado da Submissão.
+
+Este mecanismo desacopla a submissão do processamento, permitindo altas cargas e garantindo que o sistema nunca bloqueia o contribuinte.
+
+
+
+6. Gestão de Certificados e Chaves
+
+A infraestrutura de assinatura digital utilizada no sistema de Faturação Eletrónica baseia-se em criptografia assimétrica (RSA) com chaves privadas mantidas pelos produtores de software e chaves públicas registadas e validadas pela Administração Geral Tributária (AGT). As chaves privadas e públicas dos contribuintes serão geradas pela Administração Geral Tributária (AGT) podendo e disponibilizadas na conta do portal do contribinte.
+Este capítulo descreve como as chaves são distribuídas, utilizadas, validadas e atualizadas.
+Como são entregues as chaves aos contribuintes
+
+As chaves dos contribuintes utilizadas para assinatura de documentos e requisições (jwsDocumentSignature e jwsSignature) serão emitidas AGT e estarão disponiveis na conta do portaltal do contribuinte de cada contribuinte para consulta.
+
+As chaves utilizadas para assinatura do software (jwsSoftwareSignature) não são emitidas pela AGT.
+Cada produtor de software deve:
+
+    Gerar localmente um par de chaves RSA (privada + pública)
+      A chave privada nunca deve sair do ambiente do produtor.
+      A chave publica será enviada à AGT.
+
+    Submeter a chave pública durante o processo de registo do Software Produtor, via portal do parceiro:
+
+        Testes: https://portaldoparceiro.hml.minfin.gov.ao/
+
+        Produção: https://portaldoparceiro.minfin.gov.ao/
+
+Estrutura da chave (RSA mínimo 2048 bits)
+
+Para garantir interoperabilidade, desempenho e segurança, as chaves usadas têm:
+
+    Tipo: RSA
+
+    Tamanho: mínimo 2048 bits
+
+    Formato recomendado: PEM
+
+    Codificação: Base64 (padrão para PEM)
+
+Exemplo de chave pública válida:
+
+-----BEGIN PUBLIC KEY-----
+
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAw12…​
+
+…​restante conteúdo…​
+
+-----END PUBLIC KEY-----
+
+Exemplo de chave privada (que nunca deve ser enviada):
+
+-----BEGIN PRIVATE KEY-----
+
+MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBK…​
+
+-----END PRIVATE KEY-----
+Procedimento em caso de comprometimento
+
+Se o produtor suspeitar que a chave privada foi exposta:
+
+A chave comprometida deve ser imediatamente revogada
+
+O produtor deve:
+
+    Gerar um novo par de chaves RSA
+
+    Atualizar o software com a nova chave públi no portal do parceiro
+
+    Marcar a chave antiga como revogada a partir do portal
+
+Impacto sobre documentos
+
+Documentos assinados com a chave comprometida permanecem válidos se:
+
+    Já tiverem sido processados e aceites pela AGT
+
+    A assinatura digital for tecnicamente válida
+
+Porém, novas submissões deixam de ser aceites com a chave revogada.
+Como a API valida a assinatura
+
+O processo de verificação funciona assim:
+
+Receção do documento
+
+O sistema lê o JSON recebido e extrai:
+
+    jwsSoftwareSignature
+
+    jwsDocumentSignature (se aplicável)
+
+    jwsSignature (se aplicável)
+
+Busca da chave pública ativa (ou correspondente à versão)
+
+A API localiza a chave pública do produtor.
+
+Validação do JWS (RS256)
+
+O servidor:
+
+    Reconstrói o JSON canônico
+
+    Recalcula o hash
+
+    Usa a chave pública para validar o signature
+
+Resultado
+
+    Se válido → documento segue para processamento
+
+    Se inválido → retorna erro de assinatura
+
+7. Especificações do QR Code a utilizar nos documentos impressos
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+Descrição				Valor
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+Padrão					QR Code Model 2
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+Versão					4 (33 x 33 módulos)
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+Nível de correção de erros		M (15%)
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+Modo de dados				Byte
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+Codificação de caracteres		UTF-8
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+URL codificada			https://portaldocontribuinte.minfin.gov.ao/consultar-fe?emissor=nifEmissor&document=documentNo
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+Formato do arquivo			PNG, 350x350 px
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+Método de substituição
+de espaços no documentNo 		Cada espaço deve ser substituído pela sequência %20
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Deverá ser incluído o logotipo da AGT (incluído no cabeçalho deste documento), devendo nesse caso ocupar uma percentagem inferior a 20% do total da imagem.

@@ -31,6 +31,7 @@
                 <page string="Facturação Electrónica (AGT)" name="agt_fe">
                     <group>
                         <group string="Identificadores">
+                            <field name="l10n_ao_fe_serie_id" options="{'no_create': True}" readonly="state != 'draft'"/>
                             <field name="fe_request_id"/>
                             <field name="fe_submission_uuid"/>
                             <field name="fe_document_hash"/>

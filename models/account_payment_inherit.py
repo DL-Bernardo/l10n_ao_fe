@@ -35,7 +35,6 @@ class AccountPaymentInherit(models.Model):
         'l10n_ao.fe.serie', 
         string="Série de FE", 
         readonly=True, 
-        states={'draft': [('readonly', False)]},
         copy=False
     )
 

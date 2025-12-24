@@ -45,8 +45,7 @@ class AccountMoveInherit(models.Model):
     l10n_ao_fe_serie_id = fields.Many2one(
         'l10n_ao.fe.serie', 
         string="Série de FE", 
-        readonly=True, 
-        states={'draft': [('readonly', False)]},
+        readonly=True,
         copy=False
     )
     l10n_ao_fe_document_class_id = fields.Many2one(

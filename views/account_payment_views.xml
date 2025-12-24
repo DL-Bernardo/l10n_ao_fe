@@ -7,29 +7,36 @@
         <field name="arch" type="xml">
             <xpath expr="//header" position="inside">
                 <button name="action_send_fe_agt" string="Enviar AGT" type="object" class="oe_highlight" 
-                        attrs="{'invisible': [('fe_status', 'in', ('validated', 'sent', 'processing'))]}"/>
+                        invisible="fe_status in ('validated', 'sent', 'processing')"/>
                 <button name="open_obter_estado_wizard" string="Obter Estado" type="object" 
-                        attrs="{'invisible': [('fe_status', 'not in', ('sent', 'processing'))]}"/>
+                        invisible="fe_status not in ('sent', 'processing')"/>
                 <button name="open_payload_wizard" string="Ver Payload" type="object"/>
             </xpath>
+            
             <xpath expr="//sheet" position="before">
-                <div class="alert alert-info" role="alert" style="margin-bottom:0px;" attrs="{'invisible': [('fe_status', '!=', 'processing')]}">
+                <div class="alert alert-info" role="alert" style="margin-bottom:0px;" invisible="fe_status != 'processing'">
                     Este recibo está a ser processado pela AGT.
                 </div>
-                <div class="alert alert-success" role="alert" style="margin-bottom:0px;" attrs="{'invisible': [('fe_status', '!=', 'validated')]}">
+                <div class="alert alert-success" role="alert" style="margin-bottom:0px;" invisible="fe_status != 'validated'">
                     Recibo Validado pela AGT. Hash: <field name="fe_document_hash" readonly="1" class="oe_inline"/>.
                 </div>
-                <div class="alert alert-danger" role="alert" style="margin-bottom:0px;" attrs="{'invisible': [('fe_status', '!=', 'error')]}">
+                <div class="alert alert-danger" role="alert" style="margin-bottom:0px;" invisible="fe_status != 'error'">
                     Erro na validação AGT: <field name="fe_error_list" readonly="1" class="oe_inline"/>.
                 </div>
             </xpath>
-            <xpath expr="//group[@name='group_extra_info']" position="inside">
-                <group string="Facturação Electrónica AGT">
-                    <field name="l10n_ao_fe_serie_id"/>
-                    <field name="fe_status"/>
-                    <field name="fe_request_id"/>
-                    <field name="fe_sent_datetime"/>
-                    <field name="fe_submission_uuid" groups="base.group_no_one"/>
+
+            <!-- Adicionando os campos no final da folha, pois group_extra_info não existe no v17 -->
+            <xpath expr="//sheet" position="inside">
+                <group string="Facturação Electrónica AGT" name="agt_fe_fields">
+                    <group>
+                        <field name="l10n_ao_fe_serie_id" options="{'no_create': True}" readonly="state != 'draft'"/>
+                        <field name="fe_status"/>
+                        <field name="fe_request_id"/>
+                    </group>
+                    <group>
+                        <field name="fe_sent_datetime"/>
+                        <field name="fe_submission_uuid" groups="base.group_no_one"/>
+                    </group>
                 </group>
             </xpath>
         </field>

@@ -2,6 +2,7 @@
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 import logging
+import json
 
 _logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ class AccountPaymentInherit(models.Model):
         ('cancelled', 'Anulado')
     ], string="Estado FE", default='not_sent', copy=False, tracking=True)
 
+    fe_last_response = fields.Text(string="Última resposta AGT", copy=False, readonly=True)
     fe_payload_json = fields.Text(string="Último Payload JSON", copy=False, readonly=True)
     fe_document_hash = fields.Char(string="Hash AGT", copy=False, readonly=True)
     
@@ -39,7 +41,7 @@ class AccountPaymentInherit(models.Model):
 
     def action_send_fe_agt(self):
         """Gera o payload, envia para AGT e processa a resposta."""
-        service = self.env['l10n_ao.fe.service']
+        service = self.env['l10n_ao.fe.service'].with_context(force_company=self.company_id.id)
         
         for payment in self:
             if payment.state != 'posted':
@@ -50,16 +52,35 @@ class AccountPaymentInherit(models.Model):
             try:
                 response = service.registar_recibo(payment)
                 
-                # Processar resposta básica (melhorar conforme account_move_inherit)
                 request_id = response.get("requestID")
-                if request_id:
-                    payment.fe_request_id = request_id
-                    payment.fe_status = 'sent'
+                # Emissão autorizada imediata ou diferida?
+                # Para recibos, o status costuma estar no documents[0].documentStatus se for sincrono,
+                # mas geralmente é assincrono via requestID.
+                
+                vals = {
+                    'fe_request_id': request_id,
+                    'fe_status': 'sent' if request_id else 'error',
+                    'fe_last_response': json.dumps(response, indent=2, ensure_ascii=False)
+                }
+                
+                # Se a AGT devolver erro na resposta imediata
+                error_list = response.get('errorList', [])
+                if error_list:
+                    vals['fe_status'] = 'error'
+                    vals['fe_error_list'] = str(error_list)
+                
+                payment.write(vals)
+                
+                if hasattr(payment, 'message_post'):
+                    payment.message_post(body=_("Recibo enviado para a AGT. Request ID: %s", request_id))
                 
             except Exception as e:
-                payment.fe_status = 'error'
-                payment.fe_error_list = str(e)
-                raise e
+                payment.write({
+                    'fe_status': 'error',
+                    'fe_error_list': str(e)
+                })
+                if hasattr(payment, 'message_post'):
+                    payment.message_post(body=_("Erro ao enviar recibo para AGT: %s", str(e)))
 
     def open_payload_wizard(self):
         """Abre o wizard para mostrar o payload JSON."""

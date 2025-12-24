@@ -5,6 +5,8 @@ import datetime
 import requests
 from jose import jws
 import logging
+import math
+import decimal
 
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
@@ -70,9 +72,15 @@ class FeService(models.AbstractModel):
         else:
             private_key = self._get_private_key()
         try:
-            return jws.sign(payload_dict, private_key, algorithm='RS256')
+            # Garantir JSON canónico (sem espaços) para a assinatura
+            payload_json = json.dumps(payload_dict, separators=(',', ':'), ensure_ascii=False)
+            return jws.sign(payload_json.encode('utf-8'), private_key, algorithm='RS256')
         except Exception as e:
             raise UserError(_("Erro ao gerar assinatura JWS (%s): %s", key_type, e))
+
+    def _round_tax(self, amount):
+        # Arredondamento por excesso (Ceiling) para o cêntimo seguinte
+        return float(decimal.Decimal(str(amount)).quantize(decimal.Decimal('0.01'), rounding=decimal.ROUND_CEILING))
 
     def _get_software_signature(self):
         payload = {
@@ -133,41 +141,33 @@ class FeService(models.AbstractModel):
             
             if tax:
                 tax_percentage = tax.amount
-                tax_amount = (tax_base * tax_percentage) / 100
+                tax_amount = self._round_tax((tax_base * tax_percentage) / 100)
                 if tax_percentage == 0:
                     tax_code = 'ISE'
-                    # Tentar obter código de isenção (assumindo M00 se não houver campo)
-                    # exemption_code = tax.l10n_ao_exemption_code or 'M00' 
-                    # Como não tenho o campo, vou deixar vazio ou fixo se necessário.
-                    # AGT exige exemptionCode se ISE.
-                    exemption_code = 'M10' # Exemplo genérico, o user deve configurar
+                    exemption_code = 'M10' 
 
-            _logger.info("FE LINE [%s]: Prod=%s, Price=%s, TaxPerc=%s, TaxAmt=%s", i, line.product_id.default_code, tax_base, tax_percentage, tax_amount)
-            
             tax_dict = {
                 "taxType": tax_type,
                 "taxCountryRegion": "AO",
                 "taxCode": tax_code,
-                # "taxBase": f"{tax_base:.2f}", # Removido: conflita com debit/credit em faturas normais
-                "taxPercentage": f"{tax_percentage:.2f}",
-                "taxContribution": f"{tax_amount:.2f}"
+                "taxPercentage": float(tax_percentage),
+                "taxContribution": float(tax_amount)
             }
             if exemption_code:
                 tax_dict["taxExemptionCode"] = exemption_code
 
             line_data = {
-                "lineNumber": str(i),
+                "lineNumber": int(i),
                 "productCode": line.product_id.default_code or "S/COD",
                 "productDescription": line.name[:200],
-                "quantity": f"{line.quantity:.2f}",
+                "quantity": float(line.quantity),
                 "unitOfMeasure": line.product_uom_id.name or "Un",
-                "unitPrice": f"{line.price_unit:.2f}",
-                "unitPriceBase": f"{line.price_unit:.2f}",
-                # Invertido: Faturas (out_invoice) = CreditAmount (Proveito), NC (out_refund) = DebitAmount
-                "debitAmount": f"{line.price_subtotal:.2f}" if move.move_type in ('out_refund', 'in_invoice') else "0.00",
-                "creditAmount": f"{line.price_subtotal:.2f}" if move.move_type in ('out_invoice', 'in_refund') else "0.00",
+                "unitPrice": float(line.price_unit),
+                "unitPriceBase": float(line.price_unit),
+                "debitAmount": float(line.price_subtotal) if move.move_type in ('out_refund', 'in_invoice') else 0.0,
+                "creditAmount": float(line.price_subtotal) if move.move_type in ('out_invoice', 'in_refund') else 0.0,
                 "taxes": [tax_dict],
-                "settlementAmount": "0.00"
+                "settlementAmount": 0.0
             }
             
             # Bloco de Referência para Notas de Crédito (NC) e Notas de Débito (ND)
@@ -197,9 +197,9 @@ class FeService(models.AbstractModel):
             lines.append(line_data)
 
         totals = {
-            "taxPayable": f"{move.amount_tax:.2f}",
-            "netTotal": f"{move.amount_untaxed:.2f}",
-            "grossTotal": f"{move.amount_total:.2f}",
+            "taxPayable": float(move.amount_tax),
+            "netTotal": float(move.amount_untaxed),
+            "grossTotal": float(move.amount_total),
         }
 
         doc_data = {
@@ -220,7 +220,7 @@ class FeService(models.AbstractModel):
         doc_data["jwsDocumentSignature"] = jws_doc
 
         payload = {
-            "schemaVersion": "1.0",
+            "schemaVersion": "1.2",
             "submissionUUID": submission_uuid,
             "submissionTimeStamp": timestamp,
             "taxRegistrationNumber": move.company_id.vat,
@@ -228,7 +228,7 @@ class FeService(models.AbstractModel):
                 "softwareInfoDetail": software_info_detail,
                 "jwsSoftwareSignature": jws_software
             },
-            "numberOfEntries": "1",
+            "numberOfEntries": 1,
             "documents": [doc_data]
         }
 
@@ -311,18 +311,18 @@ class FeService(models.AbstractModel):
                 if inv.amount_total > 0:
                     ratio = reconciled_amount / inv.amount_total
                     inv_net_paid = inv.amount_untaxed * ratio
-                    inv_tax_paid = inv.amount_tax * ratio
+                    inv_tax_paid = self._round_tax(inv.amount_tax * ratio)
                 else:
                     inv_net_paid = reconciled_amount
                     inv_tax_paid = 0.0
                 
                 source_documents.append({
-                    "lineNo": str(len(source_documents) + 1),
+                    "lineNo": int(len(source_documents) + 1),
                     "sourceDocumentID": {
                         "originatingON": inv.name,
                         "documentDate": str(inv.invoice_date)
                     },
-                    "creditAmount": f"{inv_net_paid:.2f}" # Valor SEM imposto
+                    "creditAmount": float(inv_net_paid)
                 })
                 
                 total_net += inv_net_paid
@@ -331,19 +331,19 @@ class FeService(models.AbstractModel):
         else:
             # Sem fatura (adiantamento)
             source_documents.append({
-                "lineNo": "1",
+                "lineNo": 1,
                 "sourceDocumentID": {
                     "originatingON": payment.ref or "Adiantamento",
                     "documentDate": str(payment.date)
                 },
-                "creditAmount": f"{payment.amount:.2f}"
+                "creditAmount": float(payment.amount)
             })
             total_net = payment.amount
 
         totals = {
-            "taxPayable": f"{total_tax_payable:.2f}",
-            "netTotal": f"{total_net:.2f}",
-            "grossTotal": f"{total_gross:.2f}"
+            "taxPayable": float(total_tax_payable),
+            "netTotal": float(total_net),
+            "grossTotal": float(total_gross)
         }
 
         payment_receipt = {
@@ -352,7 +352,6 @@ class FeService(models.AbstractModel):
         
         doc_data = {
             "documentNo": document_no,
-            "seriesCode": series_code,
             "documentStatus": "N",
             "documentDate": str(payment.date),
             "documentType": serie.document_class_id.code or "RC",
@@ -380,7 +379,7 @@ class FeService(models.AbstractModel):
         jws_software, software_info_detail = self._get_software_signature()
 
         payload = {
-            "schemaVersion": "1.0",
+            "schemaVersion": "1.2",
             "submissionUUID": submission_uuid,
             "submissionTimeStamp": timestamp,
             "taxRegistrationNumber": payment.company_id.vat,
@@ -388,7 +387,7 @@ class FeService(models.AbstractModel):
                 "softwareInfoDetail": software_info_detail,
                 "jwsSoftwareSignature": jws_software
             },
-            "numberOfEntries": "1",
+            "numberOfEntries": 1,
             "documents": [doc_data]
         }
         
@@ -399,7 +398,7 @@ class FeService(models.AbstractModel):
             'fe_payload_json': payload_json,
             'fe_jws_software_signature': jws_software,
             'fe_jws_document_signature': jws_doc,
-            'fe_document_hash': jws_doc,
+            'fe_document_hash': jws_doc[-4:] if jws_doc else False,
         }
         if not preview:
             vals['fe_sent_datetime'] = fields.Datetime.now()
@@ -433,7 +432,7 @@ class FeService(models.AbstractModel):
         jws_software, software_info_detail = self._get_software_signature()
 
         payload = {
-            "schemaVersion": "1.0",
+            "schemaVersion": "1.2",
             "submissionUUID": str(uuid.uuid4()),
             "taxRegistrationNumber": tax_registration_number,
             "requestID": request_id,
@@ -463,16 +462,16 @@ class FeService(models.AbstractModel):
         # Baseado no padrão, deve incluir os identificadores principais
         sign_fields = {
             "taxRegistrationNumber": tax_registration_number,
-            "invoiceNo": document_no
+            "documentNo": document_no
         }
         jws_issuer = self._get_issuer_signature(sign_fields)
         
         payload = {
-            "schemaVersion": "1.0",
+            "schemaVersion": "1.2",
             "submissionUUID": str(uuid.uuid4()),
             "taxRegistrationNumber": tax_registration_number,
             "submissionTimeStamp": timestamp,
-            "invoiceNo": document_no,
+            "documentNo": document_no,
             "softwareInfo": {
                 "softwareInfoDetail": software_info_detail,
                 "jwsSoftwareSignature": jws_software
@@ -502,7 +501,7 @@ class FeService(models.AbstractModel):
         jws_issuer = self._get_issuer_signature(sign_fields)
         
         payload = {
-            "schemaVersion": "1.0",
+            "schemaVersion": "1.2",
             "submissionUUID": str(uuid.uuid4()),
             "submissionTimeStamp": timestamp,
             "taxRegistrationNumber": tax_registration_number,
@@ -512,10 +511,10 @@ class FeService(models.AbstractModel):
             },
             "seriesType": series_type,
             "documentType": document_type,
-            "seriesYear": current_year,
+            "seriesYear": int(current_year),
             "establishmentNumber": "0000",
             "seriesContingencyIndicator": "N",
-            "requestedQuantity": str(requested_quantity),
+            "requestedQuantity": int(requested_quantity),
             "seriesClass": "NORMAL",
             "justification": justification,
             "jwsIssuerSignature": jws_issuer
@@ -543,7 +542,7 @@ class FeService(models.AbstractModel):
         jws_issuer = self._get_issuer_signature(sign_fields)
         
         payload = {
-            "schemaVersion": "1.0",
+            "schemaVersion": "1.2",
             "submissionUUID": str(uuid.uuid4()),
             "submissionTimeStamp": timestamp,
             "taxRegistrationNumber": tax_registration_number,
@@ -572,7 +571,7 @@ class FeService(models.AbstractModel):
         jws_issuer = self._get_issuer_signature(sign_fields)
         
         payload = {
-            "schemaVersion": "1.0",
+            "schemaVersion": "1.2",
             "taxRegistrationNumber": tax_registration_number,
             "queryStartDate": str(date_from),
             "queryEndDate": str(date_to),

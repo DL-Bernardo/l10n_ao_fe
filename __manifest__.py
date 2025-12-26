@@ -20,6 +20,7 @@ Compatível com o ambiente de homologação 2025.
         'views/account_tax_views.xml',
         'views/account_move_views.xml',
         'views/account_journal_views.xml',
+        'views/ir_sequence_views.xml',
         'views/account_payment_views.xml',
         'views/account_payment_register_views.xml',
         'views/fe_queue_views.xml',

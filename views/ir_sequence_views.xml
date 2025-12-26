@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_sequence_form_inherit_fe" model="ir.ui.view">
+        <field name="name">ir.sequence.form.inherit.fe</field>
+        <field name="model">ir.sequence</field>
+        <field name="inherit_id" ref="base.view_sequence_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='implementation']" position="after">
+                <group string="Integração AGT (FE)" colspan="4">
+                    <field name="l10n_ao_fe_serie_id" options="{'no_create': True}"/>
+                    <p class="text-muted" colspan="4">
+                        Ao selecionar uma série aqui, o prefixo e o próximo número serão sincronizados automaticamente com as regras da AGT.
+                    </p>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>

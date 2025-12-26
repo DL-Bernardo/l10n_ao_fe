@@ -9,3 +9,23 @@ class AccountJournalInherit(models.Model):
         string="Série de FE por Defeito",
         help="Série da AGT que será selecionada automaticamente ao usar este diário."
     )
+
+class IrSequenceInherit(models.Model):
+    _inherit = 'ir.sequence'
+
+    l10n_ao_fe_serie_id = fields.Many2one(
+        'l10n_ao.fe.serie',
+        string="Série FE (AGT)",
+        help="Vincula esta sequência Odoo a uma série autorizada da AGT."
+    )
+
+    @api.onchange('l10n_ao_fe_serie_id')
+    def _onchange_l10n_ao_fe_serie_id(self):
+        if self.l10n_ao_fe_serie_id:
+            # Formata o prefixo conforme padrão AGT: TIPO SERIE/
+            # Ex: FT S2025/
+            doc_type = self.l10n_ao_fe_serie_id.document_class_id.code or 'FT'
+            serie_name = self.l10n_ao_fe_serie_id.name
+            self.prefix = f"{doc_type} {serie_name}/"
+            self.padding = 3 # Ex: 001, 002...
+            self.number_next_actual = self.l10n_ao_fe_serie_id.next_number or 1

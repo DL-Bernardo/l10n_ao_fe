@@ -5,8 +5,8 @@
         <field name="inherit_id" ref="account.view_move_form"/>
         <field name="arch" type="xml">
             <header position="inside">
-                <button name="action_send_fe_agt" type="object" string="Enviar FE AGT" class="btn-danger" 
-                        invisible="state != 'posted' or fe_status in ('sent', 'validated')"/>
+                <button name="action_send_fe_agt" type="object" string="Reenviar FE a AGT" class="btn-primary" 
+                        invisible="state != 'posted' or fe_status == 'validated'"/>
                 
                 <button name="action_download_fe" type="object" string="Baixar Factura Electrónica" class="btn-success"
                         invisible="fe_status not in ('sent', 'validated')"/>

@@ -19,6 +19,7 @@ Compatível com o ambiente de homologação 2025.
         'data/fe_error_code_data.xml',
         'views/account_tax_views.xml',
         'views/account_move_views.xml',
+        'views/account_journal_views.xml',
         'views/account_payment_views.xml',
         'views/account_payment_register_views.xml',
         'views/fe_queue_views.xml',

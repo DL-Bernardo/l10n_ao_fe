@@ -58,8 +58,27 @@ class AccountMoveInherit(models.Model):
 
     @api.onchange('journal_id')
     def _onchange_journal_id(self):
-        # Logic to auto-select series based on journal can be added here
-        pass
+        if self.journal_id and self.journal_id.l10n_ao_fe_serie_id:
+            self.l10n_ao_fe_serie_id = self.journal_id.l10n_ao_fe_serie_id
+
+    def action_post(self):
+        # Primeiro, executa a confirmação padrão do Odoo
+        res = super(AccountMoveInherit, self).action_post()
+        
+        # Depois de confirmada, tenta enviar para a AGT automaticamente
+        for move in self:
+            if move.move_type in ('out_invoice', 'out_refund') and move.l10n_ao_fe_serie_id:
+                _logger.info("FE AGT: Disparando envio automático para a fatura %s", move.name)
+                try:
+                    # Chamamos o método de envio que já existe
+                    # Usamos um try/except para que se a AGT estiver fora, 
+                    # a fatura continue confirmada no Odoo, mas com estado 'error'
+                    move.action_send_fe_agt()
+                except Exception as e:
+                    _logger.error("FE AGT: Erro no envio automático: %s", str(e))
+                    move.message_post(body=_("Erro no envio automático para a AGT: %s") % str(e))
+        
+        return res
 
     def _get_document_number_for_fe(self):
         """Constructs the document number based on the selected series or falls back to the invoice name."""

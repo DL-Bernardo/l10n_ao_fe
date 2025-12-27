@@ -6,8 +6,16 @@ class AccountJournalInherit(models.Model):
 
     l10n_ao_fe_serie_id = fields.Many2one(
         'l10n_ao.fe.serie', 
-        string="Série de FE por Defeito",
-        help="Série da AGT que será selecionada automaticamente ao usar este diário."
+        string="Série de Facturas",
+        domain="[('document_class_id.code', '=', 'FT'), ('agt_status', '=', 'active')]",
+        help="Série da AGT usada para Facturas (FT) neste diário."
+    )
+
+    l10n_ao_fe_refund_serie_id = fields.Many2one(
+        'l10n_ao.fe.serie', 
+        string="Série de Notas de Crédito",
+        domain="[('document_class_id.code', '=', 'NC'), ('agt_status', '=', 'active')]",
+        help="Série da AGT usada para Notas de Crédito (NC) neste diário."
     )
 
 class IrSequenceInherit(models.Model):

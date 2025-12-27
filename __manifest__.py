@@ -26,6 +26,7 @@ Compatível com o ambiente de homologação 2025.
         'views/fe_queue_views.xml',
         'views/fe_serie_views.xml',
         'wizard/fe_solicitar_serie_wizard_views.xml',
+        'wizard/account_move_reversal_views.xml',
         'views/account_report_invoice_document.xml',
         'views/fe_log_views.xml',
         'views/wizard_views.xml',

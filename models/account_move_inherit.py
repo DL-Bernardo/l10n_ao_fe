@@ -47,7 +47,8 @@ class AccountMoveInherit(models.Model):
     l10n_ao_fe_serie_id = fields.Many2one(
         'l10n_ao.fe.serie', 
         string="Série de FE", 
-        readonly=True,
+        compute='_compute_l10n_ao_fe_serie_id',
+        store=True, readonly=False, precompute=True,
         copy=False
     )
     l10n_ao_fe_document_class_id = fields.Many2one(
@@ -58,27 +59,58 @@ class AccountMoveInherit(models.Model):
     )
     l10n_ao_fe_queue_ids = fields.One2many('l10n_ao.fe.queue', 'invoice_id', string='Fila de Envio AGT')
 
-    @api.onchange('journal_id')
+    @api.depends('journal_id', 'move_type')
+    def _compute_l10n_ao_fe_serie_id(self):
+        for move in self:
+            if not move.l10n_ao_fe_serie_id:
+                if move.move_type == 'out_refund':
+                    # Tenta a série de reembolso do diário, senão busca geral
+                    if move.journal_id and move.journal_id.l10n_ao_fe_refund_serie_id:
+                        move.l10n_ao_fe_serie_id = move.journal_id.l10n_ao_fe_refund_serie_id
+                    else:
+                        serie_nc = self.env['l10n_ao.fe.serie'].search([
+                            ('document_class_id.code', '=', 'NC'),
+                            ('agt_status', '=', 'active')
+                        ], limit=1)
+                        move.l10n_ao_fe_serie_id = serie_nc.id if serie_nc else False
+                elif move.journal_id and move.journal_id.l10n_ao_fe_serie_id:
+                    move.l10n_ao_fe_serie_id = move.journal_id.l10n_ao_fe_serie_id
+                else:
+                    move.l10n_ao_fe_serie_id = False
+
+    @api.onchange('journal_id', 'move_type')
     def _onchange_journal_id(self):
-        if self.journal_id and self.journal_id.l10n_ao_fe_serie_id:
+        if self.move_type == 'out_refund':
+            if self.journal_id and self.journal_id.l10n_ao_fe_refund_serie_id:
+                self.l10n_ao_fe_serie_id = self.journal_id.l10n_ao_fe_refund_serie_id
+            else:
+                serie_nc = self.env['l10n_ao.fe.serie'].search([
+                    ('document_class_id.code', '=', 'NC'),
+                    ('agt_status', '=', 'active')
+                ], limit=1)
+                if serie_nc:
+                    self.l10n_ao_fe_serie_id = serie_nc
+        elif self.journal_id and self.journal_id.l10n_ao_fe_serie_id:
             self.l10n_ao_fe_serie_id = self.journal_id.l10n_ao_fe_serie_id
 
     def action_post(self):
-        # Primeiro, executa a confirmação padrão do Odoo
+        # Primeiro, executa a confirmação padrão do Odoo (e de outros módulos)
         res = super(AccountMoveInherit, self).action_post()
         
         # Depois de confirmada, tenta enviar para a AGT automaticamente
         for move in self:
+            _logger.info("FE AGT: Analisando envio automático para %s (Tipo: %s, Série: %s)", 
+                         move.name, move.move_type, move.l10n_ao_fe_serie_id.name if move.l10n_ao_fe_serie_id else 'N/A')
+            
+            # Garantir que out_invoice (Fatura) e out_refund (Nota de Crédito) são enviadas
             if move.move_type in ('out_invoice', 'out_refund') and move.l10n_ao_fe_serie_id:
-                _logger.info("FE AGT: Disparando envio automático para a fatura %s", move.name)
                 try:
-                    # Chamamos o método de envio que já existe
-                    # Usamos um try/except para que se a AGT estiver fora, 
-                    # a fatura continue confirmada no Odoo, mas com estado 'error'
                     move.action_send_fe_agt()
                 except Exception as e:
-                    _logger.error("FE AGT: Erro no envio automático: %s", str(e))
+                    _logger.error("FE AGT: Erro no envio automático para %s: %s", move.name, str(e))
                     move.message_post(body=_("Erro no envio automático para a AGT: %s") % str(e))
+            else:
+                _logger.info("FE AGT: Salto de envio automático para %s (Condições não reunidas)", move.name)
         
         return res
 
@@ -93,9 +125,9 @@ class AccountMoveInherit(models.Model):
 
     def action_send_fe_agt(self):
         """Gera o payload, envia para AGT e processa a resposta."""
-        service = self.env['l10n_ao.fe.service'].with_context(force_company=self.company_id.id)
-        
         for move in self:
+            service = self.env['l10n_ao.fe.service'].with_company(move.company_id)
+            
             if move.state != 'posted':
                 raise UserError(_("Apenas faturas no estado 'Lançado' podem ser enviadas à AGT."))
             

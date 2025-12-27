@@ -8,6 +8,7 @@
             <field name="communication" position="after">
                 <field name="l10n_ao_fe_serie_id" 
                        options="{'no_create': True}"
+                       force_save="1"
                        domain="[('document_class_id.code', 'in', ['RC', 'RG'])]"/>
             </field>
         </field>

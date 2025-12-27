@@ -1,5 +1,7 @@
-# -*- coding: utf-8 -*-
+import logging
 from odoo import models, fields, api, _
+
+_logger = logging.getLogger(__name__)
 
 class AccountPaymentRegisterInherit(models.TransientModel):
     _inherit = 'account.payment.register'
@@ -10,26 +12,35 @@ class AccountPaymentRegisterInherit(models.TransientModel):
         help="Série de Facturação Electrónica para o recibo a ser criado"
     )
 
+    @api.model
+    def default_get(self, fields_list):
+        res = super(AccountPaymentRegisterInherit, self).default_get(fields_list)
+        if 'journal_id' in res:
+            journal = self.env['account.journal'].browse(res['journal_id'])
+            if journal.l10n_ao_fe_serie_id:
+                res['l10n_ao_fe_serie_id'] = journal.l10n_ao_fe_serie_id.id
+        return res
+
     @api.onchange('journal_id')
     def _onchange_journal_id_fe(self):
         if self.journal_id and self.journal_id.l10n_ao_fe_serie_id:
             self.l10n_ao_fe_serie_id = self.journal_id.l10n_ao_fe_serie_id
-
-    def action_create_payments(self):
-        res = super(AccountPaymentRegisterInherit, self).action_create_payments()
-        
-        # O resultado do action_create_payments costuma ser um dicionário de ação ou True
-        # Mas os pagamentos já foram criados. No Odoo 17, os pagamentos podem ser capturados.
-        # Vamos tentar disparar via hook no account.payment (action_post) para ser mais genérico.
-        return res
+        else:
+            self.l10n_ao_fe_serie_id = False
 
     def _create_payments(self):
-        """Override para transferir a série FE para o pagamento criado."""
+        """Override para transferir a série FE e disparar o envio logo na criação."""
         payments = super(AccountPaymentRegisterInherit, self)._create_payments()
         
-        # Se foi selecionada uma série FE, atribuir ao(s) pagamento(s) criado(s)
         if self.l10n_ao_fe_serie_id:
             for payment in payments:
                 payment.l10n_ao_fe_serie_id = self.l10n_ao_fe_serie_id
+                # No Odoo 17, se o pagamento estiver 'posted', podemos enviar logo
+                if payment.state == 'posted':
+                    _logger.info("FE AGT: Enviando recibo automático pós-criação: %s", payment.name)
+                    try:
+                        payment.action_send_fe_agt()
+                    except Exception as e:
+                        _logger.error("FE AGT: Erro no envio automático: %s", str(e))
         
         return payments

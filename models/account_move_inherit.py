@@ -9,6 +9,8 @@ import base64
 from PIL import Image
 import os
 from odoo.exceptions import UserError
+from odoo.tools.misc import file_path
+import warnings
 import json
 import logging
 
@@ -242,20 +244,19 @@ class AccountMoveInherit(models.Model):
             qr_img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
 
             # Adicionar logotipo da AGT ao centro
-            logo_path = get_module_resource('l10n_ao_fe', 'static', 'description', 'agt_logo.png')
-            if logo_path and os.path.exists(logo_path):
-                try:
-                    logo = Image.open(logo_path)
+            try:
+                # Odoo 17 recomenda file_path
+                logo_full_path = file_path('l10n_ao_fe/static/description/agt_logo.png')
+                if os.path.exists(logo_full_path):
+                    logo = Image.open(logo_full_path).convert('RGBA')
                     qr_width, qr_height = qr_img.size
-
-                    # Redimensionar logo (20% do QR)
                     logo_size = int(qr_width * 0.20)
                     logo.thumbnail((logo_size, logo_size))
-                    pos = ((qr_width - logo_size) // 2, (qr_height - logo_size) // 2)
-                    qr_img.paste(logo, pos, logo) # Use logo as mask for transparency
-
-                except Exception as e:
-                    _logger.warning("Não foi possível adicionar o logotipo ao QR Code: %s", e)
+                    # Centralizar e colar usando o canal alpha como máscara
+                    pos = ((qr_width - logo.width) // 2, (qr_height - logo.height) // 2)
+                    qr_img.paste(logo, pos, logo)
+            except Exception as e:
+                _logger.warning("Não foi possível adicionar o logotipo ao QR Code: %s", e)
 
             # Redimensionar para 350x350 px
             try:

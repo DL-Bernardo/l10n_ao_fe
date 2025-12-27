@@ -13,7 +13,7 @@
                             <strong>CONTROLO AGT:</strong> <span t-esc="o.fe_document_hash if o.fe_document_hash else ''"/>
                         </p>
                         <p class="mb-1">
-                            <strong>Processado por programa certificado n.º 85/AGT/2025</strong>
+                            <strong>Processado por programa certificado n.º FE/85/AGT/2025</strong>
                         </p>
                         <p class="mb-0 mt-3 text-muted" style="font-size: 9px;">
                             Consulte a validade deste documento no Portal do Contribuinte via QR Code ou no site oficial do MINFIN.

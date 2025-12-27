@@ -9,24 +9,33 @@ class AccountPaymentRegisterInherit(models.TransientModel):
     l10n_ao_fe_serie_id = fields.Many2one(
         'l10n_ao.fe.serie', 
         string="Série de FE (Recibo)", 
+        compute='_compute_l10n_ao_fe_serie_id',
+        store=True, readonly=False, precompute=True,
         help="Série de Facturação Electrónica para o recibo a ser criado"
     )
+
+    @api.depends('journal_id')
+    def _compute_l10n_ao_fe_serie_id(self):
+        for wizard in self:
+            if wizard.journal_id and wizard.journal_id.l10n_ao_fe_serie_id:
+                wizard.l10n_ao_fe_serie_id = wizard.journal_id.l10n_ao_fe_serie_id
+            else:
+                # Tentar encontrar a primeira série RG ou RC ativa se o diário não tiver uma predefinida
+                serie = self.env['l10n_ao.fe.serie'].search([
+                    ('document_class_id.code', 'in', ['RG', 'RC']),
+                    ('agt_status', '=', 'active')
+                ], limit=1)
+                wizard.l10n_ao_fe_serie_id = serie.id if serie else False
 
     @api.model
     def default_get(self, fields_list):
         res = super(AccountPaymentRegisterInherit, self).default_get(fields_list)
-        if 'journal_id' in res:
+        # Reforço extra no default_get para garantir o ID no carregamento
+        if 'journal_id' in res and not res.get('l10n_ao_fe_serie_id'):
             journal = self.env['account.journal'].browse(res['journal_id'])
             if journal.l10n_ao_fe_serie_id:
                 res['l10n_ao_fe_serie_id'] = journal.l10n_ao_fe_serie_id.id
         return res
-
-    @api.onchange('journal_id')
-    def _onchange_journal_id_fe(self):
-        if self.journal_id and self.journal_id.l10n_ao_fe_serie_id:
-            self.l10n_ao_fe_serie_id = self.journal_id.l10n_ao_fe_serie_id
-        else:
-            self.l10n_ao_fe_serie_id = False
 
     def _create_payments(self):
         """Override para transferir a série FE e disparar o envio logo na criação."""

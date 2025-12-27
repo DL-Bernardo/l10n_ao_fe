@@ -282,14 +282,23 @@ class AccountMoveInherit(models.Model):
     # =====================================================
     def generate_qr_code(self):
         """Gera QR Code conforme especificações da AGT"""
-        base_url = self.env['ir.config_parameter'].sudo().get_param('l10n_ao_fe.qrcode_base_url', "https://portaldocontribuinte.minfin.gov.ao/consultar-fe?documentNo=")
+        # Padrão AGT: https://portaldocontribuinte.minfin.gov.ao/consultar-fe?emissor=nifEmissor&document=documentNo
+        base_url = self.env['ir.config_parameter'].sudo().get_param('l10n_ao_fe.qrcode_base_url', "https://portaldocontribuinte.minfin.gov.ao/consultar-fe")
 
         for inv in self:
             if not inv.name:
                 continue
 
+            # NIF do Emissor (Remover prefixo de país se existir para o QR Code)
+            nif_emissor = inv.company_id.vat or ""
+            if nif_emissor.startswith('AO'):
+                nif_emissor = nif_emissor[2:]
+            
+            # Número do documento com espaços substituídos por %20
             document_no = inv._get_document_number_for_fe().replace(" ", "%20")
-            qr_url = f"{base_url}{document_no}"
+            
+            # Montar URL final
+            qr_url = f"{base_url}?emissor={nif_emissor}&document={document_no}"
 
             qr = qrcode.QRCode(
                 version=4,

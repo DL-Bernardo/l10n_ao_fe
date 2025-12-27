@@ -38,6 +38,19 @@ class AccountPaymentInherit(models.Model):
         copy=False
     )
 
+    def action_post(self):
+        res = super(AccountPaymentInherit, self).action_post()
+        
+        for payment in self:
+            if payment.payment_type == 'inbound' and payment.l10n_ao_fe_serie_id:
+                _logger.info("FE AGT: Disparando envio automático para o recibo %s", payment.name)
+                try:
+                    payment.action_send_fe_agt()
+                except Exception as e:
+                    _logger.error("FE AGT: Erro no envio automático do recibo: %s", str(e))
+        
+        return res
+
     def action_send_fe_agt(self):
         """Gera o payload, envia para AGT e processa a resposta."""
         service = self.env['l10n_ao.fe.service'].with_context(force_company=self.company_id.id)

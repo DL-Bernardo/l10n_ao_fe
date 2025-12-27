@@ -6,8 +6,8 @@
         <field name="inherit_id" ref="account.view_account_payment_form"/>
         <field name="arch" type="xml">
             <xpath expr="//header" position="inside">
-                <button name="action_send_fe_agt" string="Enviar AGT" type="object" class="oe_highlight" 
-                        invisible="fe_status in ('validated', 'sent', 'processing')"/>
+                <button name="action_send_fe_agt" string="Reenviar AGT" type="object" class="oe_highlight" 
+                        invisible="fe_status == 'validated' or state != 'posted'"/>
                 <button name="open_obter_estado_wizard" string="Obter Estado" type="object" 
                         invisible="fe_status not in ('sent', 'processing')"/>
                 <button name="open_payload_wizard" string="Ver Payload" type="object"/>

@@ -73,8 +73,22 @@ class AccountMoveInherit(models.Model):
                             ('agt_status', '=', 'active')
                         ], limit=1)
                         move.l10n_ao_fe_serie_id = serie_nc.id if serie_nc else False
-                elif move.journal_id and move.journal_id.l10n_ao_fe_serie_id:
-                    move.l10n_ao_fe_serie_id = move.journal_id.l10n_ao_fe_serie_id
+                
+                elif move.move_type == 'out_invoice':
+                    # Verificar se é Nota de Débito (ND) - Geralmente tem debit_origin_id ou vem de diário ND
+                    is_debit_note = hasattr(move, 'debit_origin_id') and move.debit_origin_id
+                    
+                    if is_debit_note:
+                        if move.journal_id and move.journal_id.l10n_ao_fe_debit_serie_id:
+                            move.l10n_ao_fe_serie_id = move.journal_id.l10n_ao_fe_debit_serie_id
+                        else:
+                            serie_nd = self.env['l10n_ao.fe.serie'].search([
+                                ('document_class_id.code', '=', 'ND'),
+                                ('agt_status', '=', 'active')
+                            ], limit=1)
+                            move.l10n_ao_fe_serie_id = serie_nd.id if serie_nd else move.journal_id.l10n_ao_fe_serie_id
+                    elif move.journal_id and move.journal_id.l10n_ao_fe_serie_id:
+                        move.l10n_ao_fe_serie_id = move.journal_id.l10n_ao_fe_serie_id
                 else:
                     move.l10n_ao_fe_serie_id = False
 
@@ -90,8 +104,21 @@ class AccountMoveInherit(models.Model):
                 ], limit=1)
                 if serie_nc:
                     self.l10n_ao_fe_serie_id = serie_nc
-        elif self.journal_id and self.journal_id.l10n_ao_fe_serie_id:
-            self.l10n_ao_fe_serie_id = self.journal_id.l10n_ao_fe_serie_id
+        
+        elif self.move_type == 'out_invoice':
+            is_debit_note = hasattr(self, 'debit_origin_id') and self.debit_origin_id
+            if is_debit_note:
+                if self.journal_id and self.journal_id.l10n_ao_fe_debit_serie_id:
+                    self.l10n_ao_fe_serie_id = self.journal_id.l10n_ao_fe_debit_serie_id
+                else:
+                    serie_nd = self.env['l10n_ao.fe.serie'].search([
+                        ('document_class_id.code', '=', 'ND'),
+                        ('agt_status', '=', 'active')
+                    ], limit=1)
+                    if serie_nd:
+                        self.l10n_ao_fe_serie_id = serie_nd
+            elif self.journal_id and self.journal_id.l10n_ao_fe_serie_id:
+                self.l10n_ao_fe_serie_id = self.journal_id.l10n_ao_fe_serie_id
 
     def action_post(self):
         # Primeiro, executa a confirmação padrão do Odoo (e de outros módulos)

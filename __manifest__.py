@@ -9,7 +9,7 @@ Compatível com o ambiente de homologação 2025.
     """,
     'author': 'Digitalub / ContasMais',
     'license': 'AGPL-3',
-    'depends': ['base', 'account'],
+    'depends': ['base', 'account', 'account_debit_note'],
 
     'data': [
         'security/ir.model.access.csv',
@@ -27,6 +27,7 @@ Compatível com o ambiente de homologação 2025.
         'views/fe_serie_views.xml',
         'wizard/fe_solicitar_serie_wizard_views.xml',
         'wizard/account_move_reversal_views.xml',
+        'wizard/account_debit_note_views.xml',
         'views/account_report_invoice_document.xml',
         'views/fe_log_views.xml',
         'views/wizard_views.xml',

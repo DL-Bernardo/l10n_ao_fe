@@ -9,6 +9,7 @@
                 <group string="Facturação Electrónica (AGT)">
                     <field name="l10n_ao_fe_serie_id" options="{'no_create': True}"/>
                     <field name="l10n_ao_fe_refund_serie_id" options="{'no_create': True}" invisible="type != 'sale'"/>
+                    <field name="l10n_ao_fe_debit_serie_id" options="{'no_create': True}" invisible="type != 'sale'"/>
                 </group>
             </xpath>
         </field>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_account_debit_note_inherit_fe" model="ir.ui.view">
+        <field name="name">account.debit.note.form.inherit.fe</field>
+        <field name="model">account.debit.note</field>
+        <field name="inherit_id" ref="account_debit_note.view_account_debit_note"/>
+        <field name="arch" type="xml">
+            <field name="journal_id" position="after">
+                <field name="l10n_ao_fe_serie_id" options="{'no_create': True}" invisible="not move_ids"/>
+            </field>
+        </field>
+    </record>
+</odoo>

@@ -18,6 +18,13 @@ class AccountJournalInherit(models.Model):
         help="Série da AGT usada para Notas de Crédito (NC) neste diário."
     )
 
+    l10n_ao_fe_debit_serie_id = fields.Many2one(
+        'l10n_ao.fe.serie', 
+        string="Série de Notas de Débito",
+        domain="[('document_class_id.code', '=', 'ND'), ('agt_status', '=', 'active')]",
+        help="Série da AGT usada para Notas de Débito (ND) neste diário."
+    )
+
 class IrSequenceInherit(models.Model):
     _inherit = 'ir.sequence'
 

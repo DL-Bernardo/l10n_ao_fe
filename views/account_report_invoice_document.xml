@@ -1,23 +1,18 @@
 <odoo>
     <template id="report_invoice_document_inherit_fe" inherit_id="account.report_invoice_document">
-        <xpath expr="//table[@name='invoice_line_table']" position="after">
+        <!-- Movemos o QR Code e Info AGT para o Rodapé, abaixo das coordenadas bancárias -->
+        <xpath expr="//div[@id='qrcode']" position="after">
             <t t-if="o.fe_qr_code">
-                <div class="row mt-4" style="page-break-inside: avoid; border-top: 1px solid #dee2e6; padding-top: 15px; margin-top: 30px;">
-                    <div class="col-3 text-center">
-                        <div style="display: inline-block; border: 1px solid #eee; padding: 5px; background: #fff;">
-                            <img t-att-src="'data:image/png;base64,%s' % o.fe_qr_code.decode('utf-8')" style="width: 120px; height: 120px;"/>
-                        </div>
+                <div class="row mt-2 pt-2" style="font-family: Arial, Helvetica, sans-serif; color:#000000; border-top: 1px solid #eee; page-break-inside: avoid;">
+                    <div class="col-2 text-start">
+                        <img t-att-src="'data:image/png;base64,%s' % o.fe_qr_code.decode('utf-8')" style="width: 80px; height: 80px;"/>
                     </div>
-                    <div class="col-9" style="font-size: 11px; line-height: 1.6;">
-                        <p class="mb-1">
-                            <strong>CONTROLO AGT:</strong> <span t-esc="o.fe_document_hash if o.fe_document_hash else ''"/>
+                    <div class="col-10" style="padding-top: 15px;">
+                        <p class="mb-1" style="font-size: 9pt; white-space: nowrap;">
+                            <span t-esc="o.fe_document_hash if o.fe_document_hash else ''"/> - <strong>Processado por programa certificado n.º FE/85/AGT/2025</strong> - <strong>InvoiceOne</strong>
                         </p>
-                        <p class="mb-1">
-                            <strong>Processado por programa certificado n.º FE/85/AGT/2025</strong>
-                        </p>
-                        <p class="mb-0 mt-3 text-muted" style="font-size: 9px;">
-                            Consulte a validade deste documento no Portal do Contribuinte via QR Code ou no site oficial do MINFIN.
-                            Este documento eletrónico foi gerado e assinado conforme a legislação angolana em vigor.
+                        <p class="text-muted" style="font-size: 8pt; white-space: nowrap;">
+                            Este documento serve de prova de transmissão à AGT. Verifique a validade lendo o QR Code.
                         </p>
                     </div>
                 </div>

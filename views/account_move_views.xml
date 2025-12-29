@@ -5,19 +5,20 @@
         <field name="inherit_id" ref="account.view_move_form"/>
         <field name="arch" type="xml">
             <header position="inside">
-                <button name="action_send_fe_agt" type="object" string="Reenviar FE a AGT" class="btn-primary" 
-                        invisible="state != 'posted' or fe_status == 'validated'"/>
+                <button name="action_send_fe_agt" type="object" string="Reenviar FE a AGT" class="btn-warning" 
+                        invisible="state != 'posted' or fe_status in ('validated', 'processing', 'sent')"/>
                 
-                <button name="action_download_fe" type="object" string="Baixar Factura Electrónica" class="btn-success"
-                        invisible="fe_status not in ('sent', 'validated')"/>
+                <button name="action_download_fe" type="object" string="Baixar Factura Electrónica" class="btn-success" 
+                        invisible="fe_status != 'validated'"/>
                 
-                <button name="open_payload_wizard" type="object" string="Payload JSON" class="btn-success"/>
+                <button name="open_payload_wizard" type="object" string="Payload JSON" class="btn-success"
+                        groups="base.group_no_one"/>
                 
-                <button name="open_obter_estado_wizard" type="object" string="Obter Estado" class="btn-primary"/>
+                <button name="open_obter_estado_wizard" type="object" string="Obter Estado" class="btn-primary"
+                        invisible="not fe_request_id"/>
                 
-                <button name="open_consultar_factura_wizard" type="object" string="Consultar Factura" class="btn-primary"/>
-                
-                <button name="open_listar_facturas_wizard" type="object" string="Listar Facturas" class="btn-primary"/>
+                <button name="open_consultar_factura_wizard" type="object" string="Consultar Factura" class="btn-secondary"/>
+                <button name="open_listar_facturas_wizard" type="object" string="Listar Facturas" class="btn-secondary"/>
                 
                 <button name="action_cancel_fe" type="object" string="Anular Factura" class="btn-danger"
                         invisible="state != 'cancel'"/>

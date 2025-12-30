@@ -23,6 +23,23 @@
                 <button name="action_cancel_fe" type="object" string="Anular Factura" class="btn-danger"
                         invisible="state != 'cancel'"/>
             </header>
+
+            <!-- Ocultar botões padrão do Odoo para limpar a interface -->
+            <xpath expr="//header//button[@name='action_invoice_sent']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+            <xpath expr="//header//button[@name='preview_invoice']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+            <xpath expr="//header//button[@name='button_cancel']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+            <xpath expr="//header//button[@name='button_request_cancel']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+            <xpath expr="//header//button[@name='button_draft']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
             
             <field name="state" position="before">
                 <field name="fe_status" widget="statusbar" statusbar_visible="not_sent,processing,sent,validated,error"/>

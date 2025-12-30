@@ -36,10 +36,10 @@
                         </group>
                         <notebook>
                             <page string="Payload">
-                                <field name="payload" widget="ace" options="{'mode': 'json'}"/>
+                                <field name="payload" widget="code" options="{'mode': 'json'}"/>
                             </page>
                             <page string="Response">
-                                <field name="response" widget="ace" options="{'mode': 'json'}"/>
+                                <field name="response" widget="code" options="{'mode': 'json'}"/>
                             </page>
                         </notebook>
                     </sheet>

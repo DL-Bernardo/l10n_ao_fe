@@ -10,8 +10,7 @@
                         invisible="fe_status in ('validated', 'sent', 'processing') or state != 'posted'"/>
                 <button name="open_obter_estado_wizard" string="Obter Estado" type="object" class="btn-primary"
                         invisible="not fe_request_id"/>
-                <button name="open_payload_wizard" string="Ver Payload" type="object" class="btn-success"
-                        groups="base.group_no_one"/>
+                <button name="open_payload_wizard" string="Ver Payload" type="object" class="btn-success"/>
             </xpath>
 
             <!-- Ocultar botões padrão do Odoo para os recibos -->

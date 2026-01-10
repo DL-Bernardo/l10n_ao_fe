@@ -11,8 +11,7 @@
                 <button name="action_download_fe" type="object" string="Baixar Factura Electrónica" class="btn-success" 
                         invisible="fe_status != 'validated'"/>
                 
-                <button name="open_payload_wizard" type="object" string="Payload JSON" class="btn-success"
-                        groups="base.group_no_one"/>
+                <button name="open_payload_wizard" type="object" string="Payload JSON" class="btn-success"/>
                 
                 <button name="open_obter_estado_wizard" type="object" string="Obter Estado" class="btn-primary"
                         invisible="not fe_request_id"/>

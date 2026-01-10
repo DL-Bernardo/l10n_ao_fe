@@ -110,6 +110,30 @@ class FeService(models.AbstractModel):
     def _get_issuer_signature(self, fields_dict):
         return self._sign_payload(fields_dict, key_type='issuer')
 
+    def _get_agt_tax_type(self, tax):
+        """Detecta o tipo de imposto AGT com base no campo ou no nome/código."""
+        if not tax: return 'IVA'
+        if getattr(tax, 'l10n_ao_fe_tax_type', False):
+            return tax.l10n_ao_fe_tax_type
+        name = (tax.name or '').upper()
+        if ' II ' in name or name.startswith('II ') or 'INDUSTRIAL' in name:
+            return 'II'
+        if ' IRT ' in name or name.startswith('IRT ') or 'TRABALHO' in name:
+            return 'IRT'
+        if ' IS ' in name or name.startswith('IS ') or 'SELO' in name:
+            return 'IS'
+        if ' IP ' in name or name.startswith('IP ') or 'PREDIAL' in name:
+            return 'IP'
+        return 'IVA'
+
+    def _get_exemption_info(self, tax):
+        """Tenta obter o código de isenção, com fallback para o nome."""
+        if getattr(tax, 'l10n_ao_fe_exemption_code', False):
+            return tax.l10n_ao_fe_exemption_code
+        import re
+        match = re.search(r'M\d{2}', tax.name or '')
+        return match.group(0) if match else 'M10'
+
     def registar_factura(self, move, preview=False):
         endpoint = "/registarFactura"
         url = self._get_base_url() + endpoint
@@ -129,36 +153,45 @@ class FeService(models.AbstractModel):
         lines = []
         invoice_lines = move.invoice_line_ids.filtered(lambda l: l.display_type not in ('line_section', 'line_note'))
         
+        withholding_map = {} # Para agrupar retenções do mesmo tipo
+        
+        # 1. Processar Linhas (IVA e IS)
         for i, line in enumerate(invoice_lines, 1):
-            taxes = line.tax_ids
-            tax = None
-            if taxes:
-                taxes = taxes.sorted(key=lambda t: t.amount, reverse=True)
-                tax = taxes[0]
-
-            tax_type = 'IVA'
-            tax_code = 'NOR'
-            tax_percentage = 14.0
-            tax_amount = 0.0
+            line_taxes = []
             tax_base = line.price_subtotal
-            exemption_code = ''
             
-            if tax:
-                tax_percentage = tax.amount
-                tax_amount = self._round_tax((tax_base * tax_percentage) / 100)
-                if tax_percentage == 0:
-                    tax_code = 'ISE'
-                    exemption_code = 'M10' 
+            for tax in line.tax_ids:
+                agt_tax_type = self._get_agt_tax_type(tax)
+                # Apenas IVA e IS vão para a linha conforme spec AGT
+                if agt_tax_type in ('IVA', 'IS'):
+                    tax_percentage = abs(tax.amount)
+                    tax_amount = self._round_tax((tax_base * tax_percentage) / 100)
+                    tax_code = 'NOR'
+                    exemption_code = ''
+                    
+                    if tax_percentage == 0:
+                        tax_code = 'ISE'
+                        exemption_code = self._get_exemption_info(tax)
+                    
+                    line_taxes.append({
+                        "taxType": agt_tax_type,
+                        "taxCountryRegion": "AO",
+                        "taxCode": tax_code,
+                        "taxPercentage": float(tax_percentage),
+                        "taxContribution": float(tax_amount),
+                        **({"taxExemptionCode": exemption_code} if exemption_code else {})
+                    })
 
-            tax_dict = {
-                "taxType": tax_type,
-                "taxCountryRegion": "AO",
-                "taxCode": tax_code,
-                "taxPercentage": float(tax_percentage),
-                "taxContribution": float(tax_amount)
-            }
-            if exemption_code:
-                tax_dict["taxExemptionCode"] = exemption_code
+            # Se a linha não tiver impostos IVA/IS, adicionar IVA Isento (Requisito AGT)
+            if not line_taxes:
+                line_taxes.append({
+                    "taxType": "IVA",
+                    "taxCountryRegion": "AO",
+                    "taxCode": "ISE",
+                    "taxPercentage": 0.0,
+                    "taxContribution": 0.0,
+                    "taxExemptionCode": "M10" # Padrão se nada for encontrado
+                })
 
             line_data = {
                 "lineNumber": int(i),
@@ -170,20 +203,17 @@ class FeService(models.AbstractModel):
                 "unitPriceBase": float(line.price_unit),
                 "debitAmount": float(line.price_subtotal) if move.move_type in ('out_refund', 'in_invoice') else 0.0,
                 "creditAmount": float(line.price_subtotal) if move.move_type in ('out_invoice', 'in_refund') else 0.0,
-                "taxes": [tax_dict],
-                "settlementAmount": 0.0
+                "taxes": line_taxes,
+                "settlementAmount": float(line.discount * line.price_unit * line.quantity / 100.0) if line.discount else 0.0
             }
             
-            # Bloco de Referência para Notas de Crédito (NC) e Notas de Débito (ND)
+            # Referência para NC e ND
             doc_type = move.l10n_ao_fe_serie_id.document_class_id.code or "FT"
             if move.move_type == 'out_refund' or doc_type == 'ND':
                 origin_move = move.reversed_entry_id
-                # Se for ND, o Odoo pode não preencher reversed_entry_id, tentamos debit_origin_id (se existir em versões recentes) ou refs
                 if not origin_move and hasattr(move, 'debit_origin_id'):
                     origin_move = move.debit_origin_id
-                
                 origin_ref = origin_move.name if origin_move else (move.invoice_origin or "Desconhecido")
-                
                 ref_line_no = "1"
                 if origin_move:
                     orig_lines = origin_move.invoice_line_ids.filtered(lambda l: l.display_type not in ('line_section', 'line_note'))
@@ -191,27 +221,49 @@ class FeService(models.AbstractModel):
                         if orig_line.product_id == line.product_id:
                             ref_line_no = str(idx)
                             break
-
                 line_data["referenceInfo"] = {
                     "reference": origin_ref,
                     "reason": move.ref or ("Retificação / Débito" if doc_type == 'ND' else "Devolução / Estorno"),
                     "referenceItemLineNo": ref_line_no
                 }
-                
             lines.append(line_data)
 
+        # 2. Consolidação de Retenções via Itens do Diário (o mais fiável em Odoo para retenções)
+        for ml in move.line_ids.filtered(lambda l: l.tax_line_id):
+            tax = ml.tax_line_id
+            agt_type = self._get_agt_tax_type(tax)
+            if agt_type in ('II', 'IRT', 'IP', 'IAC'):
+                if agt_type not in withholding_map:
+                    withholding_map[agt_type] = {
+                        "withholdingTaxType": agt_type,
+                        "withholdingTaxDescription": tax.name or "Retenção na fonte",
+                        "withholdingTaxAmount": 0.0
+                    }
+                # O valor da retenção é o valor absoluto do balanço da linha de imposto no diário
+                withholding_map[agt_type]["withholdingTaxAmount"] += float(abs(ml.balance))
+
+
+        # Totais do documento
+        # taxPayable deve ser apenas IVA + IS (impostos devidos)
+        # grossTotal deve ser netTotal + taxPayable
+        total_iva_is = sum(sum(t['taxContribution'] for t in l['taxes'] if t['taxType'] in ('IVA', 'IS')) for l in lines)
+        net_total = float(move.amount_untaxed)
+        
         totals = {
-            "taxPayable": float(move.amount_tax),
-            "netTotal": float(move.amount_untaxed),
-            "grossTotal": float(move.amount_total),
+            "taxPayable": float(total_iva_is),
+            "netTotal": net_total,
+            "grossTotal": net_total + float(total_iva_is),
         }
+
+        # Lista de Retenções consolidada
+        withholding_taxes = list(withholding_map.values())
 
         doc_data = {
             "documentNo": document_no,
             "seriesCode": series_code,
-            "documentStatus": "N",
+            "documentStatus": "S" if move.move_type == 'in_invoice' else "N", # S para Autofacturação
             "documentDate": str(move.invoice_date),
-            "documentType": move.l10n_ao_fe_serie_id.document_class_id.code or "FT",
+            "documentType": doc_type,
             "systemEntryDate": timestamp,
             "customerTaxID": move.partner_id.vat or "999999999",
             "customerCountry": move.partner_id.country_id.code or "AO",
@@ -219,6 +271,9 @@ class FeService(models.AbstractModel):
             "documentTotals": totals,
             "lines": lines
         }
+        
+        if withholding_taxes:
+            doc_data["withholdingTaxList"] = withholding_taxes
         
         jws_doc = self._get_document_signature(move, doc_data)
         doc_data["jwsDocumentSignature"] = jws_doc

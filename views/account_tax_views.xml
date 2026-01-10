@@ -7,8 +7,9 @@
             <field name="inherit_id" ref="account.view_tax_form"/>
             <field name="arch" type="xml">
                 <xpath expr="//field[@name='amount_type']" position="after">
+                    <field name="l10n_ao_fe_tax_type"/>
                     <field name="l10n_ao_fe_exemption_code"
-                           invisible="amount_type != 'is_exempt'"/>
+                           invisible="amount != 0"/>
                 </xpath>
             </field>
         </record>

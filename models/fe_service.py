@@ -113,17 +113,23 @@ class FeService(models.AbstractModel):
     def _get_agt_tax_type(self, tax):
         """Detecta o tipo de imposto AGT com base no campo ou no nome/código."""
         if not tax: return 'IVA'
-        if getattr(tax, 'l10n_ao_fe_tax_type', False):
+        # 1. Respeitar escolha manual se existir
+        if getattr(tax, 'l10n_ao_fe_tax_type', False) and tax.l10n_ao_fe_tax_type != 'IVA':
             return tax.l10n_ao_fe_tax_type
+        
         name = (tax.name or '').upper()
-        if ' II ' in name or name.startswith('II ') or 'INDUSTRIAL' in name:
-            return 'II'
-        if ' IRT ' in name or name.startswith('IRT ') or 'TRABALHO' in name:
-            return 'IRT'
-        if ' IS ' in name or name.startswith('IS ') or 'SELO' in name:
-            return 'IS'
-        if ' IP ' in name or name.startswith('IP ') or 'PREDIAL' in name:
-            return 'IP'
+        
+        # 2. Critério de Retenções (Alíquota negativa)
+        if tax.amount < 0:
+            if 'IRT' in name or 'TRABALHO' in name: return 'IRT'
+            if 'II' in name or 'INDUSTRIAL' in name: return 'II'
+            if 'IP' in name or 'PREDIAL' in name: return 'IP'
+            return 'II' # Default para retenção negativa
+            
+        # 3. Critério de Nome (Prioridade ao IVA)
+        if 'IVA' in name: return 'IVA'
+        if 'IS ' in name or name.startswith('IS ') or 'SELO' in name: return 'IS'
+        
         return 'IVA'
 
     def _get_exemption_info(self, tax):
@@ -166,7 +172,9 @@ class FeService(models.AbstractModel):
                 if agt_tax_type in ('IVA', 'IS'):
                     tax_percentage = abs(tax.amount)
                     tax_amount = self._round_tax((tax_base * tax_percentage) / 100)
-                    tax_code = 'NOR'
+                    
+                    # Para IVA usamos NOR/ISE/etc. Para IS, o taxCode é diferente
+                    tax_code = 'NOR' if agt_tax_type == 'IVA' else '' # IS não usa NOR
                     exemption_code = ''
                     
                     if tax_percentage == 0:
@@ -193,18 +201,28 @@ class FeService(models.AbstractModel):
                     "taxExemptionCode": "M10" # Padrão se nada for encontrado
                 })
 
+            # Cálculo para evitar Erro E21 (Matemática da Linha)
+            # AGT 1.2: creditAmount/debitAmount = unitPrice * quantity
+            # unitPrice DEVE SER o preço unitário LÍQUIDO (já com descontos aplicados)
+            # unitPriceBase DEVE SER o preço unitário BRUTO (original)
+            unit_price_bruto = float(line.price_unit)
+            qty = float(line.quantity) or 1.0
+            subtotal_liquido = float(line.price_subtotal)
+            unit_price_net = self._round_tax(subtotal_liquido / qty)
+            desconto_total_kz = self._round_tax((unit_price_bruto * qty) - subtotal_liquido)
+
             line_data = {
                 "lineNumber": int(i),
                 "productCode": line.product_id.default_code or "S/COD",
                 "productDescription": line.name[:200],
-                "quantity": float(line.quantity),
+                "quantity": qty,
                 "unitOfMeasure": line.product_uom_id.name or "Un",
-                "unitPrice": float(line.price_unit),
-                "unitPriceBase": float(line.price_unit),
-                "debitAmount": float(line.price_subtotal) if move.move_type in ('out_refund', 'in_invoice') else 0.0,
-                "creditAmount": float(line.price_subtotal) if move.move_type in ('out_invoice', 'in_refund') else 0.0,
+                "unitPrice": unit_price_net, # Preço Unitário Líquido
+                "unitPriceBase": unit_price_bruto, # Preço Unitário Bruto
+                "debitAmount": subtotal_liquido if move.move_type in ('out_refund', 'in_invoice') else 0.0,
+                "creditAmount": subtotal_liquido if move.move_type in ('out_invoice', 'in_refund') else 0.0,
                 "taxes": line_taxes,
-                "settlementAmount": float(line.discount * line.price_unit * line.quantity / 100.0) if line.discount else 0.0
+                "settlementAmount": desconto_total_kz if desconto_total_kz > 0 else 0.0
             }
             
             # Referência para NC e ND
@@ -228,19 +246,55 @@ class FeService(models.AbstractModel):
                 }
             lines.append(line_data)
 
-        # 2. Consolidação de Retenções via Itens do Diário (o mais fiável em Odoo para retenções)
-        for ml in move.line_ids.filtered(lambda l: l.tax_line_id):
-            tax = ml.tax_line_id
-            agt_type = self._get_agt_tax_type(tax)
-            if agt_type in ('II', 'IRT', 'IP', 'IAC'):
-                if agt_type not in withholding_map:
-                    withholding_map[agt_type] = {
-                        "withholdingTaxType": agt_type,
-                        "withholdingTaxDescription": tax.name or "Retenção na fonte",
-                        "withholdingTaxAmount": 0.0
-                    }
-                # O valor da retenção é o valor absoluto do balanço da linha de imposto no diário
-                withholding_map[agt_type]["withholdingTaxAmount"] += float(abs(ml.balance))
+        # 2. Consolidação de Retenções
+        # A. INTEGRAÇÃO COM MÓDULO CUSTOMIZADO (withholding_by_group)
+        if hasattr(move, 'withholding_by_group') and move.withholding_by_group:
+            try:
+                import json
+                wht_data = json.loads(move.withholding_by_group)
+                _logger.info("FE AGT: Retenções detectadas via módulo customizado: %s", move.withholding_by_group)
+                
+                type_mapping = {
+                    'ii': 'II',
+                    'ipu': 'IP',
+                    'iac': 'IAC',
+                    'irt': 'IRT'
+                }
+
+                for wht in wht_data:
+                    # O seu JSON tem 'code', 'name', 'amount'
+                    wht_code = str(wht.get('code', 'II')).lower()
+                    agt_type = type_mapping.get(wht_code, 'II')
+                    
+                    if agt_type not in withholding_map:
+                        withholding_map[agt_type] = {
+                            "withholdingTaxType": agt_type,
+                            "withholdingTaxDescription": wht.get('name', 'Retenção na Fonte'),
+                            "withholdingTaxAmount": 0.0
+                        }
+                    withholding_map[agt_type]["withholdingTaxAmount"] = self._round_tax(
+                        withholding_map[agt_type]["withholdingTaxAmount"] + float(wht.get('amount', 0.0))
+                    )
+            except Exception as e:
+                _logger.error("FE AGT: Erro ao ler withholding_by_group: %s", e)
+
+        # B. FALLBACK: Varrer itens do diário se o mapa ainda estiver vazio
+        if not withholding_map:
+            processed_tax_ids = []
+            for ml in move.line_ids.filtered(lambda l: l.tax_line_id):
+                tax = ml.tax_line_id
+                agt_type = self._get_agt_tax_type(tax)
+                if agt_type in ('II', 'IRT', 'IP', 'IAC'):
+                    if agt_type not in withholding_map:
+                        withholding_map[agt_type] = {
+                            "withholdingTaxType": agt_type,
+                            "withholdingTaxDescription": tax.name or "Retenção na fonte",
+                            "withholdingTaxAmount": 0.0
+                        }
+                    withholding_map[agt_type]["withholdingTaxAmount"] = self._round_tax(
+                        withholding_map[agt_type]["withholdingTaxAmount"] + abs(ml.balance)
+                    )
+                    processed_tax_ids.append(tax.id)
 
 
         # Totais do documento
@@ -344,6 +398,8 @@ class FeService(models.AbstractModel):
         source_documents = []
         remaining_amount = payment.amount
         
+        withholding_map = {} # Agregador de retenções para o recibo
+        
         if invoices:
             for inv in invoices:
                 if remaining_amount <= 0:
@@ -351,8 +407,6 @@ class FeService(models.AbstractModel):
                 
                 # Tentar encontrar o valor reconciliado para esta fatura
                 reconciled_amount = 0.0
-                # Em Odoo 14+, as reconciliações estão nas linhas do movimento
-                # Procurar nas linhas do pagamento que são de conta a receber/pagar
                 payment_lines = payment.move_id.line_ids.filtered(lambda l: l.account_id.account_type in ('asset_receivable', 'liability_payable'))
                 
                 for line in payment_lines:
@@ -366,7 +420,9 @@ class FeService(models.AbstractModel):
                 if reconciled_amount == 0:
                      reconciled_amount = min(remaining_amount, inv.amount_total)
 
-                # Calcular proporção Base/Imposto
+                # Calcular proporção Base/Imposto/Retenção
+                # Nota: Com o módulo customizado, o saldo devedor da fatura já é o Líquido
+                # Mas para a AGT, reportamos a proporção sobre o total bruto da fatura
                 if inv.amount_total > 0:
                     ratio = reconciled_amount / inv.amount_total
                     inv_net_paid = inv.amount_untaxed * ratio
@@ -375,6 +431,28 @@ class FeService(models.AbstractModel):
                     inv_net_paid = reconciled_amount
                     inv_tax_paid = 0.0
                 
+                # EXTRA: Capturar retenções da fatura (Módulo customizado)
+                if hasattr(inv, 'withholding_by_group') and inv.withholding_by_group:
+                    try:
+                        wht_data = json.loads(inv.withholding_by_group)
+                        type_mapping = {'ii': 'II', 'ipu': 'IP', 'iac': 'IAC', 'irt': 'IRT'}
+                        for wht in wht_data:
+                            wht_code = str(wht.get('code', 'II')).lower()
+                            agt_type = type_mapping.get(wht_code, 'II')
+                            # Valor proporcional ao que está a ser pago agora
+                            wht_val = float(wht.get('amount', 0.0)) * ratio
+                            
+                            if agt_type not in withholding_map:
+                                withholding_map[agt_type] = {
+                                    "withholdingTaxType": agt_type,
+                                    "withholdingTaxDescription": wht.get('name', 'Retenção na Fonte'),
+                                    "withholdingTaxAmount": 0.0
+                                }
+                            withholding_map[agt_type]["withholdingTaxAmount"] = self._round_tax(
+                                withholding_map[agt_type]["withholdingTaxAmount"] + wht_val
+                            )
+                    except: pass
+
                 source_documents.append({
                     "lineNo": int(len(source_documents) + 1),
                     "sourceDocumentID": {
@@ -399,10 +477,12 @@ class FeService(models.AbstractModel):
             })
             total_net = payment.amount
 
+        # Se houver retenções no pagamento, o taxPayable ou grossTotal pode precisar de ajuste na spec AGT
+        # Mas mantemos a lógica de reporte transparente: o que foi pago em base e o que foi retido.
         totals = {
             "taxPayable": float(total_tax_payable),
             "netTotal": float(total_net),
-            "grossTotal": float(total_gross)
+            "grossTotal": float(payment.amount)
         }
 
         payment_receipt = {
@@ -421,6 +501,11 @@ class FeService(models.AbstractModel):
             "documentTotals": totals,
             "paymentReceipt": payment_receipt
         }
+        
+        # Adicionar lista de retenções se existirem
+        withholding_taxes = list(withholding_map.values())
+        if withholding_taxes:
+            doc_data["withholdingTaxList"] = withholding_taxes
         
         fields_to_sign = {
             "documentNo": doc_data.get("documentNo"),

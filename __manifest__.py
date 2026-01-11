@@ -29,6 +29,7 @@ Compatível com o ambiente de homologação 2025.
         'wizard/account_move_reversal_views.xml',
         'wizard/account_debit_note_views.xml',
         'views/account_report_invoice_document.xml',
+        'views/account_report_payment_receipt.xml',
         'views/fe_log_views.xml',
         'views/wizard_views.xml',
     ],

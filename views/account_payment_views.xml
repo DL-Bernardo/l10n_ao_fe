@@ -53,6 +53,7 @@
                     <group>
                         <field name="fe_sent_datetime"/>
                         <field name="fe_submission_uuid" groups="base.group_no_one"/>
+                        <field name="fe_qr_code" widget="image" readonly="1" invisible="not fe_qr_code"/>
                     </group>
                 </group>
             </xpath>

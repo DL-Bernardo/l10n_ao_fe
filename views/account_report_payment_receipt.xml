@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="report_payment_receipt_document_inherit_fe" inherit_id="account.report_payment_receipt_document">
+        <xpath expr="//div[@class='page']" position="inside">
+            <t t-if="o.fe_qr_code">
+                <div class="row mt-4 pt-2" style="font-family: Arial, Helvetica, sans-serif; color:#000000; border-top: 1px solid #eee; page-break-inside: avoid;">
+                    <div class="col-2 text-start">
+                        <img t-att-src="'data:image/png;base64,%s' % o.fe_qr_code.decode('utf-8')" style="width: 80px; height: 80px;"/>
+                    </div>
+                    <div class="col-10" style="padding-top: 15px;">
+                        <p class="mb-1" style="font-size: 9pt;">
+                            <span t-esc="o.fe_document_hash if o.fe_document_hash else ''"/> - <strong>Processado por programa certificado n.º FE/85/AGT/2025</strong> - <strong>InvoiceOne</strong>
+                        </p>
+                        <p class="text-muted" style="font-size: 8pt;">
+                            Este recibo serve de prova de transmissão à AGT. Verifique a validade lendo o QR Code.
+                        </p>
+                    </div>
+                </div>
+            </t>
+        </xpath>
+    </template>
+</odoo>

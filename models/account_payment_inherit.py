@@ -1,8 +1,14 @@
-# -*- coding: utf-8 -*-
-from odoo import models, fields, api, _
-from odoo.exceptions import UserError
 import logging
 import json
+import base64
+import qrcode
+from io import BytesIO
+from qrcode.constants import ERROR_CORRECT_M
+from PIL import Image
+import os
+from odoo import models, fields, api, _
+from odoo.exceptions import UserError
+from odoo.tools.misc import file_path
 
 _logger = logging.getLogger(__name__)
 
@@ -30,6 +36,7 @@ class AccountPaymentInherit(models.Model):
     
     fe_sent_datetime = fields.Datetime(string="Data de Submissão AGT", copy=False, readonly=True)
     fe_error_list = fields.Text(string="Lista de Erros", copy=False, readonly=True)
+    fe_qr_code = fields.Binary(string="QR Code AGT", copy=False, readonly=True)
 
     l10n_ao_fe_serie_id = fields.Many2one(
         'l10n_ao.fe.serie', 
@@ -65,9 +72,6 @@ class AccountPaymentInherit(models.Model):
                 response = service.registar_recibo(payment)
                 
                 request_id = response.get("requestID")
-                # Emissão autorizada imediata ou diferida?
-                # Para recibos, o status costuma estar no documents[0].documentStatus se for sincrono,
-                # mas geralmente é assincrono via requestID.
                 
                 vals = {
                     'fe_request_id': request_id,
@@ -85,6 +89,12 @@ class AccountPaymentInherit(models.Model):
                     vals['fe_error_list'] = error_msgs or str(error_list)
                 
                 payment.write(vals)
+
+                # Se for validado imediatamente
+                doc_status = response.get('documents', [{}])[0].get('documentStatus') if response.get('documents') else False
+                if doc_status == 'V':
+                    payment.write({'fe_status': 'validated'})
+                    payment.generate_qr_code()
                 
                 if hasattr(payment, 'message_post'):
                     msg = _("Recibo enviado para a AGT. Request ID: %s", request_id)
@@ -99,6 +109,62 @@ class AccountPaymentInherit(models.Model):
                 })
                 if hasattr(payment, 'message_post'):
                     payment.message_post(body=_("Erro ao enviar recibo para AGT: %s", str(e)))
+
+    def generate_qr_code(self):
+        """Gera QR Code para o recibo conforme especificações da AGT"""
+        base_url = self.env['ir.config_parameter'].sudo().get_param('l10n_ao_fe.qrcode_base_url', "https://portaldocontribuinte.minfin.gov.ao/consultar-fe")
+
+        for payment in self:
+            if not payment.name:
+                continue
+
+            # NIF do Emissor (Remover prefixo de país)
+            nif_emissor = payment.company_id.vat or ""
+            if nif_emissor.startswith('AO'):
+                nif_emissor = nif_emissor[2:]
+            
+            # Número do documento
+            document_no = payment.name.replace(" ", "%20")
+            
+            # Montar URL final
+            qr_url = f"{base_url}?emissor={nif_emissor}&document={document_no}"
+
+            qr = qrcode.QRCode(
+                version=4,
+                error_correction=ERROR_CORRECT_M,
+                box_size=10,
+                border=4,
+            )
+            qr.add_data(qr_url)
+            qr.make(fit=True)
+
+            qr_img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
+
+            # Adicionar logotipo da AGT
+            try:
+                logo_full_path = file_path('l10n_ao_fe/static/description/agt_logo.png')
+                if os.path.exists(logo_full_path):
+                    logo = Image.open(logo_full_path).convert('RGBA')
+                    qr_width, qr_height = qr_img.size
+                    logo_size = int(qr_width * 0.20)
+                    logo.thumbnail((logo_size, logo_size))
+                    pos = ((qr_width - logo.width) // 2, (qr_height - logo.height) // 2)
+                    qr_img.paste(logo, pos, logo)
+            except Exception as e:
+                _logger.warning("Não foi possível adicionar o logotipo ao QR Code do recibo: %s", e)
+
+            # Redimensionar
+            try:
+                resample = Image.Resampling.LANCZOS
+            except AttributeError:
+                resample = Image.LANCZOS
+            qr_img = qr_img.resize((350, 350), resample)
+
+            # Converter para base64
+            buf = BytesIO()
+            qr_img.save(buf, format="PNG")
+            payment.fe_qr_code = base64.b64encode(buf.getvalue())
+            buf.close()
 
     def open_payload_wizard(self):
         """Abre o wizard para mostrar o payload JSON."""

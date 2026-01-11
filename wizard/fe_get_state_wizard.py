@@ -86,6 +86,8 @@ class FeGetStateWizard(models.TransientModel):
                             vals_pay = {'fe_status': new_status}
                             if hasattr(payment, 'fe_last_response'):
                                 vals_pay['fe_last_response'] = self.response_json
+                            if new_status == 'validated' and hasattr(payment, 'generate_qr_code'):
+                                 payment.generate_qr_code()
                             payment.write(vals_pay)
                             
                             if hasattr(payment, 'message_post'):
@@ -100,6 +102,8 @@ class FeGetStateWizard(models.TransientModel):
                         new_status = payment.fe_status
                         if status == 'V':
                             new_status = 'validated'
+                            if hasattr(payment, 'generate_qr_code'):
+                                 payment.generate_qr_code()
                         elif status in ('I', 'E'):
                             new_status = 'error'
                             payment.fe_error_list = str(error_list)

@@ -122,9 +122,9 @@ class FeService(models.AbstractModel):
         # 2. Critério de Retenções (Alíquota negativa)
         if tax.amount < 0:
             if 'IRT' in name or 'TRABALHO' in name: return 'IRT'
-            if 'II' in name or 'INDUSTRIAL' in name: return 'II'
-            if 'IP' in name or 'PREDIAL' in name: return 'IP'
-            return 'II' # Default para retenção negativa
+            # AGT FE 1.2 suporta IRT, II, IS e IVA na withholdingTaxList.
+            # IP e IAC costumam ser reportados como II no payload eletrônico por limitações do servidor.
+            return 'II'
             
         # 3. Critério de Nome (Prioridade ao IVA)
         if 'IVA' in name: return 'IVA'
@@ -256,8 +256,8 @@ class FeService(models.AbstractModel):
                 
                 type_mapping = {
                     'ii': 'II',
-                    'ipu': 'IP',
-                    'iac': 'IAC',
+                    'ipu': 'II', # Mapeado para II para evitar erro E03
+                    'iac': 'II', # Mapeado para II para evitar erro E03
                     'irt': 'IRT'
                 }
 
@@ -435,7 +435,7 @@ class FeService(models.AbstractModel):
                 if hasattr(inv, 'withholding_by_group') and inv.withholding_by_group:
                     try:
                         wht_data = json.loads(inv.withholding_by_group)
-                        type_mapping = {'ii': 'II', 'ipu': 'IP', 'iac': 'IAC', 'irt': 'IRT'}
+                        type_mapping = {'ii': 'II', 'ipu': 'II', 'iac': 'II', 'irt': 'IRT'}
                         for wht in wht_data:
                             wht_code = str(wht.get('code', 'II')).lower()
                             agt_type = type_mapping.get(wht_code, 'II')

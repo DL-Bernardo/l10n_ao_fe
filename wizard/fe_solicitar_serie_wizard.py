@@ -16,6 +16,7 @@ class FeSolicitarSerieWizard(models.TransientModel):
     end_number = fields.Integer(string="Número Final", required=True)
     start_date = fields.Date(string="Data de Início", default=fields.Date.context_today, required=True)
     end_date = fields.Date(string="Data de Fim")
+    establishment_number = fields.Char(string="Número do Estabelecimento", default="SEDE", required=True)
 
     def action_solicitar_serie(self):
         self.ensure_one()
@@ -30,7 +31,8 @@ class FeSolicitarSerieWizard(models.TransientModel):
                 self.document_class_id.code,
                 qty,
                 "Utilizacao para emissao de facturas no sistema", # Justificação padrão
-                self.env.company.vat
+                self.env.company.vat,
+                establishment_number=self.establishment_number
             )
             
             result_code = resp.get('resultCode')

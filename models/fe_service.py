@@ -629,7 +629,7 @@ class FeService(models.AbstractModel):
         response = self._send_request(url, payload_json)
         return response.json()
 
-    def solicitar_serie(self, series_type, document_type, requested_quantity, justification, tax_registration_number):
+    def solicitar_serie(self, series_type, document_type, requested_quantity, justification, tax_registration_number, establishment_number="SEDE"):
         endpoint = "/solicitarSerie"
         url = self._get_base_url() + endpoint
         
@@ -642,7 +642,7 @@ class FeService(models.AbstractModel):
             "taxRegistrationNumber": tax_registration_number,
             "seriesYear": int(current_year),
             "documentType": document_type,
-            "establishmentNumber": "0000",
+            "establishmentNumber": establishment_number,
             "seriesContingencyIndicator": "N"
         }
         jws_issuer = self._get_issuer_signature(sign_fields)
@@ -659,7 +659,7 @@ class FeService(models.AbstractModel):
             "seriesType": series_type,
             "documentType": document_type,
             "seriesYear": int(current_year),
-            "establishmentNumber": "0000",
+            "establishmentNumber": establishment_number,
             "seriesContingencyIndicator": "N",
             "requestedQuantity": int(requested_quantity),
             "seriesClass": "NORMAL",

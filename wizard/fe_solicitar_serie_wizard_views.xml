@@ -18,6 +18,7 @@
                         <field name="end_number"/>
                         <field name="start_date"/>
                         <field name="end_date"/>
+                        <field name="establishment_number"/>
                     </group>
                     <footer>
                         <button name="action_solicitar_serie" string="Solicitar Série" type="object" class="btn-primary" data-hotkey="q"/>

@@ -28,7 +28,9 @@ Vá a **Configuração > Técnico > Parâmetros do Sistema** para configurar os 
 * `l10n_ao_fe.software_id`: ID do Software fornecido pela AGT (ex: FE/85/AGT/2025).
 * `l10n_ao_fe.private_key_issuer`: Chave privada PKCS#8 para assinatura JWS do Emissor.
 * `l10n_ao_fe.public_key_issuer`: Chave pública correspondente (opcional, para verificação).
-* `l10n_ao_fe.base_url`: URL do endpoint (Homologação: `https://agt.minfin.gov.ao/homologacao/fe-api`).
+* `l10n_ao_fe.base_url`: URL base do serviço (Sem barra no final).
+    * **Homologação:** `https://sifphml.minfin.gov.ao/sigt/fe/v1`
+    * **Produção:** `https://sifp.minfin.gov.ao/sigt/fe/v1`
 
 ---
 

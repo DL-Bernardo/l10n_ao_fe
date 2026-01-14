@@ -3,5 +3,10 @@ access_l10n_ao_fe_serie,l10n_ao.fe.serie,model_l10n_ao_fe_serie,base.group_user,
 access_l10n_ao_fe_document_class,l10n_ao.fe.document_class,model_l10n_ao_fe_document_class,base.group_user,1,0,0,0
 access_l10n_ao_fe_error_code,l10n_ao.fe.error_code,model_l10n_ao_fe_error_code,base.group_user,1,0,0,0
 access_l10n_ao_fe_solicitar_serie_wizard,l10n_ao.fe.solicitar.serie.wizard,model_l10n_ao_fe_solicitar_serie_wizard,base.group_user,1,1,1,1
+access_l10n_ao_fe_list_series_wizard,l10n_ao.fe.list.series.wizard,model_l10n_ao_fe_list_series_wizard,base.group_user,1,1,1,1
+access_l10n_ao_fe_get_state_wizard,l10n_ao.fe.get.state.wizard,model_l10n_ao_fe_get_state_wizard,base.group_user,1,1,1,1
+access_l10n_ao_fe_consult_invoice_wizard,l10n_ao.fe.consult.invoice.wizard,model_l10n_ao_fe_consult_invoice_wizard,base.group_user,1,1,1,1
+access_l10n_ao_fe_list_invoices_wizard,l10n_ao.fe.list.invoices.wizard,model_l10n_ao_fe_list_invoices_wizard,base.group_user,1,1,1,1
+access_l10n_ao_fe_payload_wizard,l10n_ao.fe.payload.wizard,model_l10n_ao_fe_payload_wizard,base.group_user,1,1,1,1
 access_l10n_ao_fe_queue,l10n_ao.fe.queue,model_l10n_ao_fe_queue,base.group_user,1,1,1,1
 access_l10n_ao_fe_log,l10n_ao.fe.log,model_l10n_ao_fe_log,base.group_user,1,1,1,1

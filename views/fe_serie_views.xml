@@ -80,5 +80,12 @@
             action="action_l10n_ao_fe_serie"
             sequence="10"/>
 
+        <menuitem
+            id="menu_l10n_ao_fe_series_list_remote"
+            name="Listar Séries (Remoto)"
+            parent="menu_l10n_ao_fe_root"
+            action="action_fe_list_series_wizard"
+            sequence="15"/>
+
     </data>
 </odoo>

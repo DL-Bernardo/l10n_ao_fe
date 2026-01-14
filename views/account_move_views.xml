@@ -56,6 +56,7 @@
                         <group string="Estado e Datas">
                             <field name="fe_status"/>
                             <field name="fe_sent_datetime"/>
+                            <field name="fe_qr_code" widget="image" readonly="1" invisible="not fe_qr_code" style="width: 150px; height: 150px;"/>
                         </group>
                     </group>
                     <group string="Assinaturas JWS">

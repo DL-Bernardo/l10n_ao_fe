@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_fe_list_series_wizard_form" model="ir.ui.view">
+        <field name="name">l10n_ao.fe.list.series.wizard.form</field>
+        <field name="model">l10n_ao.fe.list.series.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Listar Séries AGT">
+                <group>
+                    <field name="tax_registration_number"/>
+                </group>
+                <div invisible="not response_json">
+                    <label for="response_json"/>
+                    <field name="response_json" nolabel="1" class="oe_grey" style="font-family: monospace;"/>
+                </div>
+                <footer>
+                    <button name="action_list_series" string="Consultar AGT" type="object" class="btn-primary"/>
+                    <button string="Fechar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_fe_list_series_wizard" model="ir.actions.act_window">
+        <field name="name">Listar Séries AGT</field>
+        <field name="res_model">l10n_ao.fe.list.series.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

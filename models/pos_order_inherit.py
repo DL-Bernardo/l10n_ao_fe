@@ -14,6 +14,22 @@ class PosOrderInherit(models.Model):
 
     def export_for_ui(self):
         result = super(PosOrderInherit, self).export_for_ui()
-        result['l10n_ao_fe_hash'] = self.l10n_ao_fe_hash
-        result['l10n_ao_fe_qr_code'] = self.l10n_ao_fe_qr_code.decode('utf-8') if self.l10n_ao_fe_qr_code else None
+        if not result:
+            return result
+
+        def update_dict(order_dict, record):
+            order_dict['l10n_ao_fe_hash'] = record.l10n_ao_fe_hash
+            qr_code = record.l10n_ao_fe_qr_code
+            if qr_code and isinstance(qr_code, bytes):
+                qr_code = qr_code.decode('utf-8')
+            order_dict['l10n_ao_fe_qr_code'] = qr_code
+
+        if isinstance(result, list):
+            # No Odoo 17, export_for_ui em RecordSet retorna uma lista
+            for order, order_dict in zip(self, result):
+                update_dict(order_dict, order)
+        else:
+            # Caso seja um único dicionário
+            update_dict(result, self)
+            
         return result

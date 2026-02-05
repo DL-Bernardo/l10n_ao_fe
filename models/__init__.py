@@ -10,3 +10,5 @@ from . import fe_document_class
 from . import fe_error_code
 from . import fe_log
 from . import fe_wizard
+from . import pos_order_inherit
+from . import pos_session_inherit

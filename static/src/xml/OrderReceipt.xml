@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates id="template" xml:space="preserve">
+    <t t-inherit="point_of_sale.OrderReceipt" t-inherit-mode="extension" owl="1">
+        <xpath expr="//div[hasclass('pos-receipt-contact')]" position="after">
+            <t t-if="props.data.fe_document_hash">
+                <div class="pos-receipt-center-align" style="font-size: 11px; border-top: 1px dashed black; margin-top: 10px; padding-top: 10px; font-weight: bold;">
+                    <div><t t-esc="props.data.fe_document_hash"/></div>
+                    <div style="font-weight: normal; font-size: 9px; margin-top: 2px;">
+                        Processado por programa certificado n.º FE/85/AGT/2025
+                    </div>
+                </div>
+                <div class="pos-receipt-center-align" style="margin-top: 10px;">
+                    <img t-att-src="'data:image/png;base64,' + props.data.fe_qr_code" style="width: 120px; height: 120px;"/>
+                </div>
+                <div class="pos-receipt-center-align" style="font-size: 9px; margin-bottom: 10px;">
+                    Este documento serve de prova de transmissão à AGT.
+                </div>
+            </t>
+        </xpath>
+    </t>
+</templates>

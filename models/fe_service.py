@@ -152,7 +152,8 @@ class FeService(models.AbstractModel):
         
         serie = move.l10n_ao_fe_serie_id
         series_code = serie.name
-        document_no = move.name
+        # Usar o formato DocumentType + Espaço + Numero (Ex: FR FR...)
+        document_no = move._get_document_number_for_fe()
         
         jws_software, software_info_detail = self._get_software_signature()
         
@@ -386,7 +387,12 @@ class FeService(models.AbstractModel):
         
         serie = payment.l10n_ao_fe_serie_id
         series_code = serie.name
+        # No caso do pagamento, self.name costuma ser RC...
+        # Se não tiver o formato completo, garantimos aqui
+        doc_type = serie.document_class_id.code or "RC"
         document_no = payment.name
+        if not document_no.startswith(f"{doc_type} "):
+            document_no = f"{doc_type} {document_no}"
         
         # Nova lógica de cálculo proporcional para Recibos
         invoices = payment.reconciled_invoice_ids
@@ -603,7 +609,7 @@ class FeService(models.AbstractModel):
         jws_software, software_info_detail = self._get_software_signature()
         
         # Campos para assinatura do emissor
-        # Baseado no padrão, deve incluir os identificadores principais
+        # Ordem rigorosa da especificação: taxRegistrationNumber, depois documentNo
         sign_fields = {
             "taxRegistrationNumber": tax_registration_number,
             "documentNo": document_no
@@ -615,7 +621,7 @@ class FeService(models.AbstractModel):
             "submissionUUID": str(uuid.uuid4()),
             "taxRegistrationNumber": tax_registration_number,
             "submissionTimeStamp": timestamp,
-            "documentNo": document_no,
+            "invoiceNo": document_no, # Usando 'invoiceNo' conforme Exemplo do Pedido da spec
             "softwareInfo": {
                 "softwareInfoDetail": software_info_detail,
                 "jwsSoftwareSignature": jws_software

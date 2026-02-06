@@ -7,7 +7,7 @@ class AccountDebitNoteInherit(models.TransientModel):
     l10n_ao_fe_serie_id = fields.Many2one(
         'l10n_ao.fe.serie', 
         string="Série FE (Nota de Débito)",
-        domain="[('document_class_id.code', '=', 'ND'), ('agt_status', '=', 'active')]",
+        domain="[('document_type_code', '=', 'ND'), ('agt_status', '=', 'active')]",
         help="Selecione a série que será usada para a Nota de Débito."
     )
 
@@ -16,7 +16,7 @@ class AccountDebitNoteInherit(models.TransientModel):
         res = super(AccountDebitNoteInherit, self).default_get(fields_list)
         # Tentar preencher automaticamente uma série ND ativa
         serie_nd = self.env['l10n_ao.fe.serie'].search([
-            ('document_class_id.code', '=', 'ND'),
+            ('document_type_code', '=', 'ND'),
             ('agt_status', '=', 'active')
         ], limit=1)
         if serie_nd:

@@ -54,9 +54,15 @@ class AccountMoveInherit(models.Model):
     l10n_ao_fe_document_class_id = fields.Many2one(
         'l10n_ao.fe.document.class', 
         string="Tipo de Documento FE",
-        related='l10n_ao_fe_serie_id.document_class_id',
-        store=True
+        compute='_compute_l10n_ao_fe_document_class_id',
+        store=True, readonly=False, precompute=True
     )
+
+    @api.depends('l10n_ao_fe_serie_id')
+    def _compute_l10n_ao_fe_document_class_id(self):
+        for move in self:
+            move.l10n_ao_fe_document_class_id = move.l10n_ao_fe_serie_id.document_class_id
+
     l10n_ao_fe_queue_ids = fields.One2many('l10n_ao.fe.queue', 'invoice_id', string='Fila de Envio AGT')
 
     @api.depends('journal_id', 'move_type')
@@ -142,13 +148,19 @@ class AccountMoveInherit(models.Model):
         return res
 
     def _get_document_number_for_fe(self):
-        """Constructs the document number based on the selected series or falls back to the invoice name."""
+        """Constructs the document number based on the selected series or falls back to the invoice name.
+        Ensures format: DocumentType + space + DocumentNo (e.g., FR FR6026S5139N/001)
+        """
         self.ensure_one()
-        if self.l10n_ao_fe_serie_id and self.l10n_ao_fe_serie_id.sequence_id:
-            # This logic might need adjustment depending on how sequences are configured.
-            # Assuming the name is already correctly set by the sequence.
-            return self.name
-        return self.name
+        doc_type = self.l10n_ao_fe_serie_id.document_class_id.code if self.l10n_ao_fe_serie_id else 'FT'
+        document_no = self.name or ''
+        
+        # Se o nome já começa com o tipo do documento e um espaço, não repetimos
+        if document_no.startswith(f"{doc_type} "):
+            return document_no
+        
+        # Caso contrário, prefixamos conforme exigência da AGT para consulta
+        return f"{doc_type} {document_no}"
 
     def action_send_fe_agt(self):
         """Gera o payload, envia para AGT e processa a resposta."""
@@ -247,6 +259,8 @@ class AccountMoveInherit(models.Model):
 
     def open_consultar_factura_wizard(self):
         self.ensure_one()
+        # Garantir formato oficial para a consulta
+        document_no = self._get_document_number_for_fe()
         return {
             'name': _('Consultar Fatura AGT'),
             'type': 'ir.actions.act_window',
@@ -254,7 +268,7 @@ class AccountMoveInherit(models.Model):
             'view_mode': 'form',
             'target': 'new',
             'context': {
-                'default_document_no': self.name,
+                'default_document_no': document_no,
                 'default_tax_registration_number': self.company_id.vat
             }
         }
@@ -281,9 +295,12 @@ class AccountMoveInherit(models.Model):
     # MÉTODO PARA GERAR O QR CODE (PADRÃO AGT)
     # =====================================================
     def generate_qr_code(self):
-        """Gera QR Code conforme especificações da AGT"""
-        # Padrão AGT: https://portaldocontribuinte.minfin.gov.ao/consultar-fe?emissor=nifEmissor&document=documentNo
-        base_url = self.env['ir.config_parameter'].sudo().get_param('l10n_ao_fe.qrcode_base_url', "https://portaldocontribuinte.minfin.gov.ao/consultar-fe")
+        """Gera QR Code conforme especificações actualizadas da AGT (Novo URL 2026)"""
+        # Novo URL Oficial (AGT): https://quiosqueagt.minfin.gov.ao/facturacao-eletronica/consultar-fe
+        base_url = self.env['ir.config_parameter'].sudo().get_param(
+            'l10n_ao_fe.qrcode_base_url', 
+            "https://quiosqueagt.minfin.gov.ao/facturacao-eletronica/consultar-fe"
+        )
 
         for inv in self:
             if not inv.name:
@@ -294,15 +311,17 @@ class AccountMoveInherit(models.Model):
             if nif_emissor.startswith('AO'):
                 nif_emissor = nif_emissor[2:]
             
-            # Número do documento com espaços substituídos por %20
-            document_no = inv._get_document_number_for_fe().replace(" ", "%20")
+            # Número do documento completo (Tipo + Espaço + Numero)
+            # Cada espaço deve ser substituído pela sequência %20
+            full_document_no = inv._get_document_number_for_fe()
+            document_no_encoded = full_document_no.replace(" ", "%20")
             
-            # Montar URL final
-            qr_url = f"{base_url}?emissor={nif_emissor}&document={document_no}"
+            # Montar URL final conforme especificação
+            qr_url = f"{base_url}?emissor={nif_emissor}&document={document_no_encoded}"
 
             qr = qrcode.QRCode(
-                version=4,
-                error_correction=ERROR_CORRECT_M,
+                version=4, # Versão 4 (33 x 33 módulos) conforme spec
+                error_correction=ERROR_CORRECT_M, # Nível M (15%) conforme spec
                 box_size=10,
                 border=4,
             )
@@ -313,20 +332,18 @@ class AccountMoveInherit(models.Model):
 
             # Adicionar logotipo da AGT ao centro
             try:
-                # Odoo 17 recomenda file_path
                 logo_full_path = file_path('l10n_ao_fe/static/description/agt_logo.png')
                 if os.path.exists(logo_full_path):
                     logo = Image.open(logo_full_path).convert('RGBA')
                     qr_width, qr_height = qr_img.size
                     logo_size = int(qr_width * 0.20)
                     logo.thumbnail((logo_size, logo_size))
-                    # Centralizar e colar usando o canal alpha como máscara
                     pos = ((qr_width - logo.width) // 2, (qr_height - logo.height) // 2)
                     qr_img.paste(logo, pos, logo)
             except Exception as e:
                 _logger.warning("Não foi possível adicionar o logotipo ao QR Code: %s", e)
 
-            # Redimensionar para 350x350 px
+            # Redimensionar para 350x350 px (Requisito Fiscal)
             try:
                 resample = Image.Resampling.LANCZOS
             except AttributeError:
@@ -338,3 +355,12 @@ class AccountMoveInherit(models.Model):
             qr_img.save(buf, format="PNG")
             inv.fe_qr_code = base64.b64encode(buf.getvalue())
             buf.close()
+
+    def action_regenerate_fe_qr_codes(self):
+        """Actualiza os QR Codes de faturas já validadas com o novo formato e URL."""
+        # Apenas para faturas que já têm QR Code gerado anteriormente
+        moves = self.search([('fe_qr_code', '!=', False)])
+        if moves:
+            moves.generate_qr_code()
+            return True
+        return False

@@ -21,6 +21,7 @@ class FESerie(models.Model):
         string="Tipo de Documento",
         required=True
     )
+    document_type_code = fields.Char(related='document_class_id.code', store=True, string="Código do Tipo")
     start_date = fields.Date(string="Data de Início", required=True, default=fields.Date.today)
     end_date = fields.Date(string="Data de Fim", help="Data em que a série expira.")
     sequence_id = fields.Many2one('ir.sequence', string="Sequência Odoo", readonly=True, copy=False)

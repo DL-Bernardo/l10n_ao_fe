@@ -111,8 +111,12 @@ class AccountPaymentInherit(models.Model):
                     payment.message_post(body=_("Erro ao enviar recibo para AGT: %s", str(e)))
 
     def generate_qr_code(self):
-        """Gera QR Code para o recibo conforme especificações da AGT"""
-        base_url = self.env['ir.config_parameter'].sudo().get_param('l10n_ao_fe.qrcode_base_url', "https://portaldocontribuinte.minfin.gov.ao/consultar-fe")
+        """Gera QR Code para o recibo conforme especificações actualizadas da AGT (Novo URL 2026)"""
+        # Novo URL Oficial (AGT): https://quiosqueagt.minfin.gov.ao/facturacao-eletronica/consultar-fe
+        base_url = self.env['ir.config_parameter'].sudo().get_param(
+            'l10n_ao_fe.qrcode_base_url', 
+            "https://quiosqueagt.minfin.gov.ao/facturacao-eletronica/consultar-fe"
+        )
 
         for payment in self:
             if not payment.name:
@@ -124,14 +128,20 @@ class AccountPaymentInherit(models.Model):
                 nif_emissor = nif_emissor[2:]
             
             # Número do documento
-            document_no = payment.name.replace(" ", "%20")
+            # Garantir formato Tipo + Espaço + Numero (Ex: RC RC...)
+            doc_type = payment.l10n_ao_fe_serie_id.document_class_id.code or "RC"
+            document_no = payment.name
+            if not document_no.startswith(f"{doc_type} "):
+                document_no = f"{doc_type} {document_no}"
+            
+            document_no_encoded = document_no.replace(" ", "%20")
             
             # Montar URL final
-            qr_url = f"{base_url}?emissor={nif_emissor}&document={document_no}"
+            qr_url = f"{base_url}?emissor={nif_emissor}&document={document_no_encoded}"
 
             qr = qrcode.QRCode(
-                version=4,
-                error_correction=ERROR_CORRECT_M,
+                version=4, # Versão 4
+                error_correction=ERROR_CORRECT_M, # Nível M
                 box_size=10,
                 border=4,
             )
@@ -153,7 +163,7 @@ class AccountPaymentInherit(models.Model):
             except Exception as e:
                 _logger.warning("Não foi possível adicionar o logotipo ao QR Code do recibo: %s", e)
 
-            # Redimensionar
+            # Redimensionar para 350x350
             try:
                 resample = Image.Resampling.LANCZOS
             except AttributeError:

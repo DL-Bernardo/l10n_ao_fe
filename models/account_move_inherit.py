@@ -257,6 +257,50 @@ class AccountMoveInherit(models.Model):
             }
         }
 
+    def action_sync_status_from_query(self):
+        """Tenta recuperar o estado da factura através do serviço de consulta (invoiceNo).
+        Útil para quando a factura já existe na AGT mas o Odoo ficou com erro.
+        """
+        self.ensure_one()
+        service = self.env['l10n_ao.fe.service'].with_context(force_company=self.company_id.id)
+        document_no = self._get_document_number_for_fe()
+        
+        try:
+            response = service.consultar_factura(document_no, self.company_id.vat)
+            # Na resposta de consulta bem sucedida, o documentStatus vem dentro de 'document'
+            # ou no root dependendo da versão. Vimos que vem no root como 'N' ou 'V'
+            status = response.get('documentStatus')
+            
+            if status in ('N', 'V', 'P'):
+                doc_data = response.get('document', {})
+                vals = {
+                    'fe_status': 'validated',
+                    'fe_document_hash': doc_data.get('jwsSignature', '')[-4:],
+                    'fe_last_response': json.dumps(response, indent=2, ensure_ascii=False)
+                }
+                self.write(vals)
+                self.generate_qr_code()
+                self.message_post(body=_("Fatura sincronizada com sucesso via Consulta AGT. Estado: %s") % status)
+                return True
+            else:
+                error_list = response.get('errorList', [])
+                raise UserError(_("AGT indica que o documento ainda não é válido ou não foi encontrado. Resposta: %s") % error_list)
+        except Exception as e:
+            raise UserError(_("Erro ao tentar sincronizar com AGT: %s") % str(e))
+
+    def action_force_manual_validate(self):
+        """Força a validação manual do documento. Apenas para administradores."""
+        if not self.env.user.has_group('account.group_account_manager'):
+            raise UserError(_("Apenas administradores de faturação podem forçar a validação manual."))
+            
+        for move in self:
+            move.write({
+                'fe_status': 'validated',
+            })
+            move.generate_qr_code()
+            move.message_post(body=_("ATENÇÃO: Factura validada MANUALMENTE por um administrador. Certifique-se que o documento existe no portal da AGT."))
+        return True
+
     def open_consultar_factura_wizard(self):
         self.ensure_one()
         # Garantir formato oficial para a consulta

@@ -19,6 +19,14 @@
                 <button name="open_consultar_factura_wizard" type="object" string="Consultar Factura" class="btn-secondary"/>
                 <button name="open_listar_facturas_wizard" type="object" string="Listar Facturas" class="btn-secondary"/>
                 
+                <button name="action_sync_status_from_query" type="object" string="Sincronizar com AGT" class="btn-info"
+                        invisible="fe_status != 'error'"/>
+                
+                <button name="action_force_manual_validate" type="object" string="Validar Manualmente" class="btn-danger"
+                        groups="account.group_account_manager"
+                        confirm="Tem a certeza que deseja validar manualmente? Use isto apenas se o documento já existir no portal da AGT."
+                        invisible="fe_status != 'error'"/>
+
                 <button name="action_cancel_fe" type="object" string="Anular Factura" class="btn-danger"
                         invisible="state != 'cancel'"/>
             </header>

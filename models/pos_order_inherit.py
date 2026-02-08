@@ -10,6 +10,38 @@ class PosOrderInherit(models.Model):
 
     def _prepare_invoice_vals(self):
         vals = super(PosOrderInherit, self)._prepare_invoice_vals()
+        
+        # Identificar como factura vinda do POS
+        vals['is_pos_invoice'] = True
+        
+        # Para a AGT, faturas do POS são Factura-Recibo (FR) porque são pagas na hora
+        # 1. Tentar encontrar o diário FR padrão do módulo de certificação
+        journal_fr = self.env.ref('opc_certification_ao_v17.opc_journal_fr', raise_if_not_found=False)
+        
+        # 2. Se não encontrou pelo XML ID, procurar por saft_inv_type
+        if not journal_fr:
+            journal_fr = self.env['account.journal'].search([
+                ('saft_inv_type', '=', 'FR'),
+                ('type', '=', 'sale'),
+                ('company_id', '=', self.company_id.id)
+            ], limit=1)
+        
+        if journal_fr:
+            vals['journal_id'] = journal_fr.id
+            # No Odoo 17, a série FE pode estar no diário ou ser buscada via document_class
+            if hasattr(journal_fr, 'l10n_ao_fe_serie_id') and journal_fr.l10n_ao_fe_serie_id:
+                vals['l10n_ao_fe_serie_id'] = journal_fr.l10n_ao_fe_serie_id.id
+        
+        # 2. Se não encontrou no diário, tenta procurar uma série FR activa independente
+        if not vals.get('l10n_ao_fe_serie_id'):
+            serie_fr = self.env['l10n_ao.fe.serie'].search([
+                ('document_class_id.code', '=', 'FR'),
+                ('agt_status', '=', 'active'),
+                ('company_id', '=', self.company_id.id)
+            ], limit=1)
+            if serie_fr:
+                vals['l10n_ao_fe_serie_id'] = serie_fr.id
+            
         return vals
 
     def export_for_ui(self):

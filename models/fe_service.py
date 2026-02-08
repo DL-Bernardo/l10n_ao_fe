@@ -327,6 +327,30 @@ class FeService(models.AbstractModel):
             "lines": lines
         }
         
+        # Secção Legal: Meios de Pagamento para FR (Factura/Recibo)
+        if doc_type == 'FR':
+            payment_mechanisms = []
+            # 1. Tentar obter pagamentos reconciliados (Odoo standard / POS)
+            for payment in move._get_reconciled_payments():
+                payment_mechanisms.append({
+                    "paymentMechanism": self._get_agt_payment_method(payment.journal_id),
+                    "paymentAmount": float(payment.amount),
+                    "paymentDate": str(payment.date)
+                })
+            
+            # 2. Fallback: Se não houver pagamentos ainda, mas houver diário customizado (FR Autopayment)
+            if not payment_mechanisms and hasattr(move, 'fr_payment_journal_id') and move.fr_payment_journal_id:
+                payment_mechanisms.append({
+                    "paymentMechanism": self._get_agt_payment_method(move.fr_payment_journal_id),
+                    "paymentAmount": float(move.amount_total),
+                    "paymentDate": str(move.invoice_date or fields.Date.today())
+                })
+            
+            if payment_mechanisms:
+                doc_data["paymentMechanisms"] = payment_mechanisms
+            elif not preview:
+                 _logger.warning("FE AGT: Factura/Recibo %s sem meios de pagamento detectados!", move.name)
+        
         if withholding_taxes:
             doc_data["withholdingTaxList"] = withholding_taxes
         
@@ -735,6 +759,22 @@ class FeService(models.AbstractModel):
         
         response = self._send_request(url, payload_json)
         return response.json()
+
+    def _get_agt_payment_method(self, journal):
+        """Mapeia o tipo de diário Odoo para o código de meio de pagamento AGT."""
+        if not journal:
+            return 'OU'
+        j_type = journal.type
+        # Mapeamento básico conforme spec AGT
+        if j_type == 'cash':
+            return 'NU' # Numerário
+        elif j_type == 'bank':
+            # Se for banco, tentamos distinguir se é cartão ou transferência pelo nome/code
+            name = (journal.name or "").upper()
+            if "CARTAO" in name or "MULTICAIXA" in name or "POS" in name:
+                return 'CD' # Cartão Débito
+            return 'TR' # Transferência
+        return 'OU' # Outros
 
     def _send_request(self, url, payload_json):
         username = self._get_conf("username")

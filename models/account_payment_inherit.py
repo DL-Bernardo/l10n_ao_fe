@@ -112,10 +112,10 @@ class AccountPaymentInherit(models.Model):
 
     def generate_qr_code(self):
         """Gera QR Code para o recibo conforme especificações actualizadas da AGT (Novo URL 2026)"""
-        # Novo URL Oficial (AGT): https://quiosqueagt.minfin.gov.ao/facturacao-eletronica/consultar-fe
+        # Novo URL Oficial (AGT): https://quiosqueagt.hml.minfin.gov.ao/facturacao-eletronica/consultar-fe
         base_url = self.env['ir.config_parameter'].sudo().get_param(
             'l10n_ao_fe.qrcode_base_url', 
-            "https://quiosqueagt.minfin.gov.ao/facturacao-eletronica/consultar-fe"
+            "https://quiosqueagt.hml.minfin.gov.ao/facturacao-eletronica/consultar-fe"
         )
 
         for payment in self:

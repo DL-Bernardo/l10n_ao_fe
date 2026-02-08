@@ -64,6 +64,9 @@ class AccountMoveInherit(models.Model):
             move.l10n_ao_fe_document_class_id = move.l10n_ao_fe_serie_id.document_class_id
 
     l10n_ao_fe_queue_ids = fields.One2many('l10n_ao.fe.queue', 'invoice_id', string='Fila de Envio AGT')
+    
+    # Campo técnico para identificação de facturas vindas do POS
+    is_pos_invoice = fields.Boolean(string="É Factura POS", default=False, copy=False)
 
     @api.depends('journal_id', 'move_type')
     def _compute_l10n_ao_fe_serie_id(self):
@@ -340,10 +343,10 @@ class AccountMoveInherit(models.Model):
     # =====================================================
     def generate_qr_code(self):
         """Gera QR Code conforme especificações actualizadas da AGT (Novo URL 2026)"""
-        # Novo URL Oficial (AGT): https://quiosqueagt.minfin.gov.ao/facturacao-eletronica/consultar-fe
+        # Novo URL Oficial (AGT): https://quiosqueagt.hml.minfin.gov.ao/facturacao-eletronica/consultar-fe
         base_url = self.env['ir.config_parameter'].sudo().get_param(
             'l10n_ao_fe.qrcode_base_url', 
-            "https://quiosqueagt.minfin.gov.ao/facturacao-eletronica/consultar-fe"
+            "https://quiosqueagt.hml.minfin.gov.ao/facturacao-eletronica/consultar-fe"
         )
 
         for inv in self:

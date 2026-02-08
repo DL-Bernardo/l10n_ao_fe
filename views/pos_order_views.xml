@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pos_order_form_inherit_fe" model="ir.ui.view">
+        <field name="name">pos.order.form.inherit.fe</field>
+        <field name="model">pos.order</field>
+        <field name="inherit_id" ref="point_of_sale.view_pos_pos_form"/>
+        <field name="arch" type="xml">
+            <header position="inside">
+                <!-- Botão de Factura case o original tenha desaparecido por algum motivo -->
+                <button name="action_pos_order_invoice" string="Gerar Factura AGT" type="object" 
+                        invisible="state != 'done' or account_move" 
+                        class="btn-primary"
+                        groups="account.group_account_invoice"/>
+            </header>
+
+            <xpath expr="//notebook" position="inside">
+                <page string="Facturação Electrónica (AGT)" name="agt_fe">
+                    <group>
+                        <group string="Estado">
+                            <field name="l10n_ao_fe_status" widget="badge" 
+                                   decoration-success="l10n_ao_fe_status == 'validated'"
+                                   decoration-danger="l10n_ao_fe_status == 'error'"/>
+                            <field name="account_move" readonly="1" invisible="not account_move"/>
+                        </group>
+                        <group string="Dados AGT" invisible="not account_move">
+                            <field name="l10n_ao_fe_hash"/>
+                            <field name="l10n_ao_fe_qr_code" widget="image" style="width: 150px; height: 150px;"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>

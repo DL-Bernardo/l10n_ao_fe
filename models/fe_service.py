@@ -496,11 +496,42 @@ class FeService(models.AbstractModel):
                 total_tax_payable += inv_tax_paid
                 remaining_amount -= reconciled_amount
         else:
-            # Sem fatura (adiantamento)
+            # Sem factura electrónica no Odoo (Pode ser Adiantamento ou Saldo Histórico Migrado)
+            # Vamos tentar detectar se está reconciliado com lançamentos manuais (Migração)
+            manual_refs = []
+            payment_lines = payment.move_id.line_ids.filtered(lambda l: l.account_id.account_type in ('asset_receivable', 'liability_payable'))
+            
+            for line in payment_lines:
+                for partial in (line.matched_debit_ids + line.matched_credit_ids):
+                    opp_line = partial.debit_move_id if partial.credit_move_id == line else partial.credit_move_id
+                    move = opp_line.move_id
+                    if move.move_type == 'entry': 
+                         ref = move.ref or move.name
+                         if ref and ref not in manual_refs:
+                             manual_refs.append(ref)
+            
+            # Para a AGT, o originatingON deve ser idealmente um número de documento.
+            # Evitamos prefixos como "Saldo Histórico:" que causam rejeição por formato inválido.
+            # Se for um Adiantamento ou Saldo Migrado sem factura electrónica associada:
+            # A AGT exige no 'originatingON' um número de documento que ela reconheça.
+            # Para evitar o erro E99, se não houver factura, usamos o número do PRÓPRIO RECIBO.
+            if manual_refs:
+                # Se houver uma referência manual (ex: migração), tentamos usá-la limpa
+                origin_name = manual_refs[0].split(' ')[0]
+                if len(origin_name) < 3:
+                    origin_name = manual_refs[0]
+            else:
+                # Caso de adiantamento puro ou se a referência manual falhar
+                # Usamos o próprio número do recibo (document_no já formatado acima)
+                origin_name = document_no
+            
+            # Limpeza e limite de caracteres
+            origin_name = str(origin_name)[:60].strip()
+
             source_documents.append({
                 "lineNo": 1,
                 "sourceDocumentID": {
-                    "originatingON": payment.ref or "Adiantamento",
+                    "originatingON": origin_name,
                     "documentDate": str(payment.date)
                 },
                 "creditAmount": float(payment.amount)

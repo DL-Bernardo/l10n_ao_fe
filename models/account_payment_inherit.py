@@ -45,6 +45,9 @@ class AccountPaymentInherit(models.Model):
         copy=False
     )
 
+    # Campo técnico para compatibilidade com vistas legadas
+    pos_order_id = fields.Many2one('pos.order', string="Ordem POS (Legado)", readonly=True)
+
     def action_post(self):
         res = super(AccountPaymentInherit, self).action_post()
         

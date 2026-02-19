@@ -21,6 +21,7 @@ Compatível com o ambiente de homologação 2025.
         'wizard/fe_list_series_wizard_views.xml',
         'wizard/account_move_reversal_views.xml',
         'wizard/account_debit_note_views.xml',
+        'wizard/fe_migration_wizard_views.xml',
         'views/account_tax_views.xml',
         'views/account_move_views.xml',
         'views/account_move_actions.xml',

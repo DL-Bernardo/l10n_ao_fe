@@ -7,3 +7,4 @@ from . import fe_solicitar_serie_wizard
 from . import fe_list_series_wizard
 from . import account_move_reversal_inherit
 from . import account_debit_note_inherit
+from . import fe_migration_wizard

@@ -10,3 +10,4 @@ access_l10n_ao_fe_list_invoices_wizard,l10n_ao.fe.list.invoices.wizard,model_l10
 access_l10n_ao_fe_payload_wizard,l10n_ao.fe.payload.wizard,model_l10n_ao_fe_payload_wizard,base.group_user,1,1,1,1
 access_l10n_ao_fe_queue,l10n_ao.fe.queue,model_l10n_ao_fe_queue,base.group_user,1,1,1,1
 access_l10n_ao_fe_log,l10n_ao.fe.log,model_l10n_ao_fe_log,base.group_user,1,1,1,1
+access_l10n_ao_fe_migration_wizard,l10n_ao_fe.migration.wizard,model_l10n_ao_fe_migration_wizard,base.group_erp_manager,1,1,1,1

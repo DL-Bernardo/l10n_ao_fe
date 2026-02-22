@@ -11,3 +11,4 @@ access_l10n_ao_fe_payload_wizard,l10n_ao.fe.payload.wizard,model_l10n_ao_fe_payl
 access_l10n_ao_fe_queue,l10n_ao.fe.queue,model_l10n_ao_fe_queue,base.group_user,1,1,1,1
 access_l10n_ao_fe_log,l10n_ao.fe.log,model_l10n_ao_fe_log,base.group_user,1,1,1,1
 access_l10n_ao_fe_migration_wizard,l10n_ao_fe.migration.wizard,model_l10n_ao_fe_migration_wizard,base.group_erp_manager,1,1,1,1
+access_l10n_ao_fe_inventory_export_wizard,l10n_ao_fe.inventory.export.wizard,model_l10n_ao_fe_inventory_export_wizard,stock.group_stock_manager,1,1,1,1

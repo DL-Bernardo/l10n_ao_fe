@@ -9,7 +9,7 @@ Compatível com o ambiente de homologação 2025.
     """,
     'author': 'Digitalub / ContasMais',
     'license': 'AGPL-3',
-    'depends': ['base', 'account', 'account_debit_note', 'point_of_sale', 'opc_certification_ao_v17'],
+    'depends': ['base', 'account', 'stock', 'account_debit_note', 'point_of_sale', 'opc_certification_ao_v17'],
 
     'data': [
         'security/ir.model.access.csv',
@@ -22,6 +22,7 @@ Compatível com o ambiente de homologação 2025.
         'wizard/account_move_reversal_views.xml',
         'wizard/account_debit_note_views.xml',
         'wizard/fe_migration_wizard_views.xml',
+        'wizard/fe_inventory_export_views.xml',
         'views/account_tax_views.xml',
         'views/account_move_views.xml',
         'views/account_move_actions.xml',
@@ -31,6 +32,7 @@ Compatível com o ambiente de homologação 2025.
         'views/account_payment_register_views.xml',
         'views/fe_queue_views.xml',
         'views/fe_serie_views.xml',
+        'views/product_views.xml',
         'views/account_report_invoice_document.xml',
         'views/account_report_payment_receipt.xml',
         'views/fe_log_views.xml',

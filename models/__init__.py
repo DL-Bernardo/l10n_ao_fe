@@ -13,3 +13,4 @@ from . import fe_log
 from . import fe_wizard
 from . import pos_order_inherit
 from . import pos_session_inherit
+from . import product_inherit

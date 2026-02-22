@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_l10n_ao_fe_inventory_export_wizard_form" model="ir.ui.view">
+        <field name="name">l10n_ao_fe.inventory.export.wizard.form</field>
+        <field name="model">l10n_ao_fe.inventory.export.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Exportar SAF-T de Inventário">
+                <sheet>
+                    <field name="state" invisible="1"/>
+                    <div class="alert alert-info" role="alert" invisible="state != 'choose'">
+                        <strong>Obrigação Legal 2026:</strong> Conforme a Circular 05/2026 da AGT, o ficheiro de inventário de 2025 deve ser submetido até 15 de Abril de 2026. 
+                        Este assistente gera o ficheiro XML com as existências finais do período.
+                    </div>
+                    
+                    <group invisible="state != 'choose'">
+                        <group>
+                            <field name="year"/>
+                            <field name="date_inventory"/>
+                        </group>
+                        <group>
+                            <field name="costing_method"/>
+                            <field name="no_operations"/>
+                            <field name="ignore_history"/>
+                        </group>
+                    </group>
+
+                    <div invisible="state != 'get'" class="text-center">
+                        <h2>Ficheiro Gerado com Sucesso!</h2>
+                        <p>Clique no botão abaixo para descarregar o ficheiro XML para submissão no Portal do Contribuinte.</p>
+                        <field name="file_data" filename="file_name" widget="binary"/>
+                        <field name="file_name" invisible="1"/>
+                    </div>
+                </sheet>
+                <footer>
+                    <button name="action_generate_saft_inventory" string="Gerar XML" type="object" class="btn-primary" invisible="state != 'choose'"/>
+                    <button string="Fechar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_l10n_ao_fe_inventory_export_wizard" model="ir.actions.act_window">
+        <field name="name">SAF-T de Inventário (AGT)</field>
+        <field name="res_model">l10n_ao_fe.inventory.export.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+    <!-- Menu Item for Inventory Export in Stock Reporting -->
+    <menuitem
+        id="menu_l10n_ao_fe_inventory_export"
+        name="SAF-T de Inventário (AGT)"
+        parent="stock.menu_warehouse_report"
+        action="action_l10n_ao_fe_inventory_export_wizard"
+        sequence="100"
+        groups="stock.group_stock_manager"/>
+</odoo>

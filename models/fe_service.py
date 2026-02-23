@@ -700,12 +700,13 @@ class FeService(models.AbstractModel):
         jws_software, software_info_detail = self._get_software_signature()
         
         # Ordem e campos rigorosos conforme especificação AGT 1.2
-        # A assinatura deve conter apenas estes 4 campos na ordem: taxRegistrationNumber, establishmentNumber, seriesYear, documentType
+        # A assinatura deve conter 5 campos na ordem: taxRegistrationNumber, seriesYear, documentType, establishmentNumber, seriesContingencyIndicator
         sign_fields = {
             "taxRegistrationNumber": tax_registration_number,
-            "establishmentNumber": establishment_number,
-            "seriesYear": int(current_year),
+            "seriesYear": str(current_year),
             "documentType": document_type,
+            "establishmentNumber": establishment_number,
+            "seriesContingencyIndicator": "N"
         }
         jws_issuer = self._get_issuer_signature(sign_fields)
         
@@ -718,7 +719,7 @@ class FeService(models.AbstractModel):
                 "softwareInfoDetail": software_info_detail,
                 "jwsSoftwareSignature": jws_software
             },
-            "seriesYear": int(current_year),
+            "seriesYear": str(current_year),
             "documentType": document_type,
             "establishmentNumber": establishment_number,
             "jwsSignature": jws_issuer,

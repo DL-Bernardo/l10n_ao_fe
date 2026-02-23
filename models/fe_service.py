@@ -695,16 +695,17 @@ class FeService(models.AbstractModel):
         url = self._get_base_url() + endpoint
         
         timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-        current_year = str(datetime.datetime.now().year)
+        current_year = datetime.datetime.now().year
         
         jws_software, software_info_detail = self._get_software_signature()
         
+        # Ordem e campos rigorosos conforme especificação AGT 1.2
+        # A assinatura deve conter apenas estes 4 campos na ordem: taxRegistrationNumber, establishmentNumber, seriesYear, documentType
         sign_fields = {
             "taxRegistrationNumber": tax_registration_number,
+            "establishmentNumber": establishment_number,
             "seriesYear": int(current_year),
             "documentType": document_type,
-            "establishmentNumber": establishment_number,
-            "seriesContingencyIndicator": "N"
         }
         jws_issuer = self._get_issuer_signature(sign_fields)
         
@@ -717,18 +718,14 @@ class FeService(models.AbstractModel):
                 "softwareInfoDetail": software_info_detail,
                 "jwsSoftwareSignature": jws_software
             },
-            "seriesType": series_type,
-            "documentType": document_type,
             "seriesYear": int(current_year),
+            "documentType": document_type,
             "establishmentNumber": establishment_number,
-            "seriesContingencyIndicator": "N",
-            "requestedQuantity": int(requested_quantity),
-            "seriesClass": "NORMAL",
-            "justification": justification,
-            "jwsSignature": jws_issuer
+            "jwsSignature": jws_issuer,
+            "seriesContingencyIndicator": "N"
         }
         
-        payload_json = json.dumps(payload, indent=2)
+        payload_json = json.dumps(payload, indent=2, ensure_ascii=False)
         _logger.info("SOLICITAR SERIE PAYLOAD: %s", payload_json)
         self._log_communication(endpoint, 'request', payload_json)
         

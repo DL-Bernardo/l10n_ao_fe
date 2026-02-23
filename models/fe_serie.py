@@ -22,6 +22,20 @@ class FESerie(models.Model):
         required=True
     )
     document_type_code = fields.Char(related='document_class_id.code', store=True, string="Código do Tipo")
+
+    # Campos auxiliares para domínios simplificados
+    is_ft = fields.Boolean(string="É Factura", compute='_compute_doc_types', store=True)
+    is_nc = fields.Boolean(string="É Nota de Crédito", compute='_compute_doc_types', store=True)
+    is_nd = fields.Boolean(string="É Nota de Débito", compute='_compute_doc_types', store=True)
+
+    @api.depends('document_class_id.code')
+    def _compute_doc_types(self):
+        for rec in self:
+            code = rec.document_class_id.code
+            rec.is_ft = (code == 'FT')
+            rec.is_nc = (code == 'NC')
+            rec.is_nd = (code == 'ND')
+
     start_date = fields.Date(string="Data de Início", required=True, default=fields.Date.today)
     end_date = fields.Date(string="Data de Fim", help="Data em que a série expira.")
     sequence_id = fields.Many2one('ir.sequence', string="Sequência Odoo", readonly=True, copy=False)

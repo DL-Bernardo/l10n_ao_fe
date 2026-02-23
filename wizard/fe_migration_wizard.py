@@ -15,7 +15,7 @@ class FEMigrationWizard(models.TransientModel):
                                       help="Ex: FT FA2024/001. Será enviada no campo 'ref' da fatura.")
     
     l10n_ao_fe_serie_id = fields.Many2one('l10n_ao.fe.serie', string="Série FE (2026)", required=True,
-                                         domain=[('document_class_id.code', '=', 'FT'), ('active', '=', True)],
+                                         domain="[('is_ft', '=', True), ('active', '=', True)]",
                                          help="Selecione uma série de 2026 autorizada para Faturas (FT).")
     
     migration_account_id = fields.Many2one('account.account', string="Conta de Contrapartida", required=True,

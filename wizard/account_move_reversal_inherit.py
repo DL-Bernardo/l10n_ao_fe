@@ -7,7 +7,7 @@ class AccountMoveReversalInherit(models.TransientModel):
     l10n_ao_fe_serie_id = fields.Many2one(
         'l10n_ao.fe.serie', 
         string="Série FE (Nota de Crédito)",
-        domain=[('document_class_id.code', '=', 'NC'), ('agt_status', '=', 'active')],
+        domain="[('is_nc', '=', True), ('agt_status', '=', 'active')]",
         help="Selecione a série que será usada para a Nota de Crédito."
     )
 

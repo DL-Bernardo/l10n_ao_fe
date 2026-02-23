@@ -7,7 +7,7 @@ class AccountDebitNoteInherit(models.TransientModel):
     l10n_ao_fe_serie_id = fields.Many2one(
         'l10n_ao.fe.serie', 
         string="Série FE (Nota de Débito)",
-        domain=[('document_class_id.code', '=', 'ND'), ('agt_status', '=', 'active')],
+        domain="[('is_nd', '=', True), ('agt_status', '=', 'active')]",
         help="Selecione a série que será usada para a Nota de Débito."
     )
 

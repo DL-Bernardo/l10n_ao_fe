@@ -7,21 +7,21 @@ class AccountJournalInherit(models.Model):
     l10n_ao_fe_serie_id = fields.Many2one(
         'l10n_ao.fe.serie', 
         string="Série de Facturas",
-        domain=[('document_class_id.code', '=', 'FT'), ('agt_status', '=', 'active')],
+        domain="[('is_ft', '=', True), ('agt_status', '=', 'active')]",
         help="Série da AGT usada para Facturas (FT) neste diário."
     )
 
     l10n_ao_fe_refund_serie_id = fields.Many2one(
         'l10n_ao.fe.serie', 
         string="Série de Notas de Crédito",
-        domain=[('document_class_id.code', '=', 'NC'), ('agt_status', '=', 'active')],
+        domain="[('is_nc', '=', True), ('agt_status', '=', 'active')]",
         help="Série da AGT usada para Notas de Crédito (NC) neste diário."
     )
 
     l10n_ao_fe_debit_serie_id = fields.Many2one(
         'l10n_ao.fe.serie', 
         string="Série de Notas de Débito",
-        domain=[('document_class_id.code', '=', 'ND'), ('agt_status', '=', 'active')],
+        domain="[('is_nd', '=', True), ('agt_status', '=', 'active')]",
         help="Série da AGT usada para Notas de Débito (ND) neste diário."
     )
 

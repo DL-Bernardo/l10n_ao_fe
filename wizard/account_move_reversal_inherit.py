@@ -7,7 +7,7 @@ class AccountMoveReversalInherit(models.TransientModel):
     l10n_ao_fe_serie_id = fields.Many2one(
         'l10n_ao.fe.serie', 
         string="Série FE (Nota de Crédito)",
-        domain="[('document_type_code', '=', 'NC'), ('agt_status', '=', 'active')]",
+        domain=[('document_class_id.code', '=', 'NC'), ('agt_status', '=', 'active')],
         help="Selecione a série que será usada para a Nota de Crédito."
     )
 
@@ -16,7 +16,7 @@ class AccountMoveReversalInherit(models.TransientModel):
         res = super(AccountMoveReversalInherit, self).default_get(fields_list)
         # Tentar preencher automaticamente uma série NC ativa
         serie_nc = self.env['l10n_ao.fe.serie'].search([
-            ('document_type_code', '=', 'NC'),
+            ('document_class_id.code', '=', 'NC'),
             ('agt_status', '=', 'active')
         ], limit=1)
         if serie_nc:

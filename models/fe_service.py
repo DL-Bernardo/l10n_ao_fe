@@ -301,13 +301,13 @@ class FeService(models.AbstractModel):
         # Totais do documento
         # taxPayable deve ser apenas IVA + IS (impostos devidos)
         # grossTotal deve ser netTotal + taxPayable
-        total_iva_is = sum(sum(t['taxContribution'] for t in l['taxes'] if t['taxType'] in ('IVA', 'IS')) for l in lines)
-        net_total = float(move.amount_untaxed)
+        total_iva_is = round(sum(sum(t['taxContribution'] for t in l['taxes'] if t['taxType'] in ('IVA', 'IS')) for l in lines), 2)
+        net_total = round(float(move.amount_untaxed), 2)
         
         totals = {
-            "taxPayable": float(total_iva_is),
+            "taxPayable": total_iva_is,
             "netTotal": net_total,
-            "grossTotal": net_total + float(total_iva_is),
+            "grossTotal": round(net_total + total_iva_is, 2),
         }
 
         # Lista de Retenções consolidada
@@ -541,9 +541,9 @@ class FeService(models.AbstractModel):
         # Se houver retenções no pagamento, o taxPayable ou grossTotal pode precisar de ajuste na spec AGT
         # Mas mantemos a lógica de reporte transparente: o que foi pago em base e o que foi retido.
         totals = {
-            "taxPayable": float(total_tax_payable),
-            "netTotal": float(total_net),
-            "grossTotal": float(payment.amount)
+            "taxPayable": round(float(total_tax_payable), 2),
+            "netTotal": round(float(total_net), 2),
+            "grossTotal": round(float(payment.amount), 2)
         }
 
         payment_receipt = {
@@ -699,9 +699,11 @@ class FeService(models.AbstractModel):
         
         jws_software, software_info_detail = self._get_software_signature()
         
+        # A documentação especifica a ordem exacta para a assinatura Payload assinatura Solicitar Serie:
+        # taxRegistrationNumber, seriesYear, documentType, establishmentNumber, seriesContingencyIndicator
         sign_fields = {
             "taxRegistrationNumber": tax_registration_number,
-            "seriesYear": int(current_year),
+            "seriesYear": str(current_year),
             "documentType": document_type,
             "establishmentNumber": establishment_number,
             "seriesContingencyIndicator": "N"
@@ -711,21 +713,17 @@ class FeService(models.AbstractModel):
         payload = {
             "schemaVersion": "1.2",
             "submissionUUID": str(uuid.uuid4()),
-            "submissionTimeStamp": timestamp,
             "taxRegistrationNumber": tax_registration_number,
+            "submissionTimeStamp": timestamp,
             "softwareInfo": {
                 "softwareInfoDetail": software_info_detail,
                 "jwsSoftwareSignature": jws_software
             },
-            "seriesType": series_type,
+            "seriesYear": str(current_year),
             "documentType": document_type,
-            "seriesYear": int(current_year),
             "establishmentNumber": establishment_number,
-            "seriesContingencyIndicator": "N",
-            "requestedQuantity": int(requested_quantity),
-            "seriesClass": "NORMAL",
-            "justification": justification,
-            "jwsSignature": jws_issuer
+            "jwsSignature": jws_issuer,
+            "seriesContingencyIndicator": "N"
         }
         
         payload_json = json.dumps(payload, indent=2)

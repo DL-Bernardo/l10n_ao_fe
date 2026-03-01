@@ -52,6 +52,19 @@
                 <field name="fe_status" widget="statusbar" statusbar_visible="not_sent,processing,sent,validated,error"/>
             </field>
 
+            <!-- Nova posição para o campo referência, debaixo do Diário -->
+            <xpath expr="//div[@name='journal_div']" position="after">
+                <field name="ref" string="Referência do Cliente" invisible="move_type not in ('out_invoice', 'out_refund')"/>
+            </xpath>
+
+            <!-- Esconder o campo e a label padrão na aba Outra Informação (grupo FATURA) -->
+            <xpath expr="//group[@name='sale_info_group']//label[@for='ref']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+            <xpath expr="//group[@name='sale_info_group']//field[@name='ref']" position="attributes">
+                <attribute name="invisible">1</attribute>
+            </xpath>
+
             <xpath expr="//notebook" position="inside">
                 <page string="Facturação Electrónica (AGT)" name="agt_fe">
                     <group>

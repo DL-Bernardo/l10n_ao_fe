@@ -1,5 +1,16 @@
 <odoo>
     <template id="report_invoice_document_inherit_fe" inherit_id="account.report_invoice_document">
+        <!-- Adicionar a Ref. Doc.(Origem) antes do bloco de informações, para aparecer logo por baixo do título da factura -->
+        <xpath expr="//div[@id='informations']" position="before">
+            <t t-if="o.ref">
+                <div class="mt-2 mb-3" style="font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #000000;">
+                    <strong>Ref. Doc.(Origem):</strong>
+                    <br/>
+                    <span t-field="o.ref"/>
+                </div>
+            </t>
+        </xpath>
+
         <!-- Movemos o QR Code e Info AGT para o Rodapé, abaixo das coordenadas bancárias -->
         <xpath expr="//div[@id='qrcode']" position="after">
             <t t-if="o.fe_qr_code">

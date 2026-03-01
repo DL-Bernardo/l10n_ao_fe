@@ -2,6 +2,16 @@
     <template id="report_invoice_document_inherit_fe" inherit_id="account.report_invoice_document">
         <!-- Adicionar a Ref. Doc.(Origem) antes do bloco de informações, para aparecer logo por baixo do título da factura -->
         <xpath expr="//div[@id='informations']" position="before">
+            <!-- Marca de Água para Homologação (Testes) -->
+            <t t-set="is_hml" t-value="'sifphml' in env['ir.config_parameter'].sudo().get_param('l10n_ao_fe.base_url', '')"/>
+            <t t-if="is_hml">
+                <div class="watermark" style="position: fixed; top: 35%; left: -5%; width: 110%; text-align: left; padding-left: 10%; opacity: 0.2; z-index: 10; transform: rotate(-25deg); color: red; pointer-events: none; font-weight: bold; line-height: 1.1;">
+                    <span style="font-size: 3em;">AMBIENTE DE</span><br/>
+                    <span style="font-size: 3em;">HOMOLOGAÇÃO</span><br/>
+                    <span style="font-size: 0.9em;">DOCUMENTO EMITIDO PARA FINS DE FORMAÇÃO / DEMONSTRAÇÃO - SEM VALIDADE FISCAL</span>
+                </div>
+            </t>
+
             <t t-if="o.ref">
                 <div class="mt-2 mb-3" style="font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #000000;">
                     <strong>Ref. Doc.(Origem):</strong>

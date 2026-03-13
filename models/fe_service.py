@@ -423,7 +423,7 @@ class FeService(models.AbstractModel):
         
         total_tax_payable = 0.0
         total_net = 0.0
-        total_gross = payment.amount
+        total_gross_paid = 0.0
         
         source_documents = []
         remaining_amount = payment.amount
@@ -450,16 +450,21 @@ class FeService(models.AbstractModel):
                 if reconciled_amount == 0:
                      reconciled_amount = min(remaining_amount, inv.amount_total)
 
-                # Calcular proporção Base/Imposto/Retenção
-                # Nota: Com o módulo customizado, o saldo devedor da fatura já é o Líquido
-                # Mas para a AGT, reportamos a proporção sobre o total bruto da fatura
-                if inv.amount_total > 0:
-                    ratio = reconciled_amount / inv.amount_total
-                    inv_net_paid = inv.amount_untaxed * ratio
+                # Calcular proporção Base/Imposto/Retenção para garantir submissão com o valor comercial
+                # O IVA Cativo (Retenções) diminui o exigível. A AGT exige o proporcional da fatura total (Bruto)
+                wht_amount = getattr(inv, 'withholding_amount', 0.0) or 0.0
+                base_debt = inv.amount_total - wht_amount if getattr(inv, 'amount_total', 0) else 0.0
+                
+                if base_debt > 0:
+                    ratio = reconciled_amount / base_debt
+                    inv_gross_paid = self._round_tax(inv.amount_total * ratio)
                     inv_tax_paid = self._round_tax(inv.amount_tax * ratio)
+                    inv_net_paid = round(inv_gross_paid - inv_tax_paid, 2)
                 else:
-                    inv_net_paid = reconciled_amount
+                    ratio = 1.0
+                    inv_gross_paid = self._round_tax(reconciled_amount)
                     inv_tax_paid = 0.0
+                    inv_net_paid = inv_gross_paid
                 
                 # EXTRA: Capturar retenções da fatura (Módulo customizado)
                 if hasattr(inv, 'withholding_by_group') and inv.withholding_by_group:
@@ -489,11 +494,12 @@ class FeService(models.AbstractModel):
                         "originatingON": inv.name,
                         "documentDate": str(inv.invoice_date)
                     },
-                    "creditAmount": float(inv_net_paid)
+                    "creditAmount": float(inv_gross_paid)
                 })
                 
                 total_net += inv_net_paid
                 total_tax_payable += inv_tax_paid
+                total_gross_paid += inv_gross_paid
                 remaining_amount -= reconciled_amount
         else:
             # Sem factura electrónica no Odoo (Pode ser Adiantamento ou Saldo Histórico Migrado)
@@ -537,13 +543,13 @@ class FeService(models.AbstractModel):
                 "creditAmount": float(payment.amount)
             })
             total_net = payment.amount
+            total_gross_paid = payment.amount
 
-        # Se houver retenções no pagamento, o taxPayable ou grossTotal pode precisar de ajuste na spec AGT
-        # Mas mantemos a lógica de reporte transparente: o que foi pago em base e o que foi retido.
+        # O grossTotal do recibo (RG) na AGT deve representar o valor da divida extinta (Base + Imposto)
         totals = {
             "taxPayable": round(float(total_tax_payable), 2),
             "netTotal": round(float(total_net), 2),
-            "grossTotal": round(float(payment.amount), 2)
+            "grossTotal": round(float(total_gross_paid), 2)
         }
 
         payment_receipt = {

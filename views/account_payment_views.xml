@@ -45,6 +45,11 @@
             <!-- Adicionando os campos no final da folha, pois group_extra_info não existe no v17 -->
             <xpath expr="//sheet" position="inside">
                 <group string="Facturação Electrónica AGT" name="agt_fe_fields">
+                    <group string="Referência a Documentos de Origem (SAFT Histórico)">
+                        <field name="l10n_ao_fe_origin_type" widget="radio" options="{'horizontal': true}"/>
+                        <field name="l10n_ao_fe_legacy_origin_number" invisible="l10n_ao_fe_origin_type != 'legacy'" required="l10n_ao_fe_origin_type == 'legacy'"/>
+                        <field name="l10n_ao_fe_legacy_origin_date" invisible="l10n_ao_fe_origin_type != 'legacy'" required="l10n_ao_fe_origin_type == 'legacy'"/>
+                    </group>
                     <group>
                         <field name="l10n_ao_fe_serie_id" options="{'no_create': True}" readonly="state != 'draft'"/>
                         <field name="fe_status"/>

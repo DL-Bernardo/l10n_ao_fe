@@ -48,6 +48,24 @@ class AccountPaymentInherit(models.Model):
     # Campo técnico para compatibilidade com vistas legadas
     pos_order_id = fields.Many2one('pos.order', string="Ordem POS (Legado)", readonly=True)
 
+    # Campos para coexistência com SAFT/Documentos Históricos
+    l10n_ao_fe_origin_type = fields.Selection([
+        ('fe', 'Factura Electrónica (Sistema)'),
+        ('legacy', 'Documento Histórico (SAFT)')
+    ], string="Tipo de Documento Origem", default='fe', copy=False)
+    
+    l10n_ao_fe_legacy_origin_number = fields.Char(string="Nº Documento Original (Histórico)", copy=False, help="Ex: FT 204")
+    l10n_ao_fe_legacy_origin_date = fields.Date(string="Data Doc. Original", copy=False)
+    
+    @api.constrains('l10n_ao_fe_origin_type', 'l10n_ao_fe_legacy_origin_number', 'l10n_ao_fe_legacy_origin_date')
+    def _check_legacy_payment_data(self):
+        for payment in self:
+            if payment.l10n_ao_fe_origin_type == 'legacy':
+                if not payment.l10n_ao_fe_legacy_origin_number:
+                    raise UserError(_("Deve indicar o número do documento original histórico no recibo."))
+                if not payment.l10n_ao_fe_legacy_origin_date:
+                    raise UserError(_("Deve indicar a data do documento original histórico no recibo."))
+
     def action_post(self):
         res = super(AccountPaymentInherit, self).action_post()
         

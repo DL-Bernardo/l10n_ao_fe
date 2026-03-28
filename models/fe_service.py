@@ -229,22 +229,35 @@ class FeService(models.AbstractModel):
             # Referência para NC e ND
             doc_type = move.l10n_ao_fe_serie_id.document_class_id.code or "FT"
             if move.move_type == 'out_refund' or doc_type == 'ND':
-                origin_move = move.reversed_entry_id
-                if not origin_move and hasattr(move, 'debit_origin_id'):
-                    origin_move = move.debit_origin_id
-                origin_ref = origin_move.name if origin_move else (move.invoice_origin or "Desconhecido")
-                ref_line_no = "1"
-                if origin_move:
-                    orig_lines = origin_move.invoice_line_ids.filtered(lambda l: l.display_type not in ('line_section', 'line_note'))
-                    for idx, orig_line in enumerate(orig_lines, 1):
-                        if orig_line.product_id == line.product_id:
-                            ref_line_no = str(idx)
-                            break
-                line_data["referenceInfo"] = {
-                    "reference": origin_ref,
-                    "reason": move.ref or ("Retificação / Débito" if doc_type == 'ND' else "Devolução / Estorno"),
-                    "referenceItemLineNo": ref_line_no
-                }
+                if move.l10n_ao_fe_origin_type == 'legacy':
+                    # Lógica de coexistência (Documento Histórico)
+                    origin_ref = move.l10n_ao_fe_legacy_origin_number or "Desconhecido"
+                    ref_reason = move.l10n_ao_fe_legacy_reason or ("Retificação / Débito" if doc_type == 'ND' else "Devolução / Estorno")
+                    ref_line_no = "1"
+                    
+                    line_data["referenceInfo"] = {
+                        "reference": origin_ref,
+                        "reason": ref_reason,
+                        "referenceItemLineNo": ref_line_no
+                    }
+                else:
+                    # Lógica original para Documentos de Faturação Electrónica normais
+                    origin_move = move.reversed_entry_id
+                    if not origin_move and hasattr(move, 'debit_origin_id'):
+                        origin_move = move.debit_origin_id
+                    origin_ref = origin_move.name if origin_move else (move.invoice_origin or "Desconhecido")
+                    ref_line_no = "1"
+                    if origin_move:
+                        orig_lines = origin_move.invoice_line_ids.filtered(lambda l: l.display_type not in ('line_section', 'line_note'))
+                        for idx, orig_line in enumerate(orig_lines, 1):
+                            if orig_line.product_id == line.product_id:
+                                ref_line_no = str(idx)
+                                break
+                    line_data["referenceInfo"] = {
+                        "reference": origin_ref,
+                        "reason": move.ref or ("Retificação / Débito" if doc_type == 'ND' else "Devolução / Estorno"),
+                        "referenceItemLineNo": ref_line_no
+                    }
             lines.append(line_data)
 
         # 2. Consolidação de Retenções
@@ -430,7 +443,19 @@ class FeService(models.AbstractModel):
         
         withholding_map = {} # Agregador de retenções para o recibo
         
-        if invoices:
+        if payment.l10n_ao_fe_origin_type == 'legacy':
+            # Lógica de coexistência (Pagamento baseado em Factura SAFT/Histórica)
+            source_documents.append({
+                "lineNo": 1,
+                "sourceDocumentID": {
+                    "originatingON": payment.l10n_ao_fe_legacy_origin_number or "Desconhecido",
+                    "documentDate": str(payment.l10n_ao_fe_legacy_origin_date or fields.Date.today())
+                },
+                "creditAmount": float(payment.amount)
+            })
+            total_net = payment.amount
+            total_gross_paid = payment.amount
+        elif invoices:
             for inv in invoices:
                 if remaining_amount <= 0:
                     break

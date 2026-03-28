@@ -7,8 +7,8 @@ class AccountJournalInherit(models.Model):
     l10n_ao_fe_serie_id = fields.Many2one(
         'l10n_ao.fe.serie', 
         string="Série de Facturas",
-        domain="[('document_class_id.code', '=', 'FT'), ('agt_status', '=', 'active')]",
-        help="Série da AGT usada para Facturas (FT) neste diário."
+        domain="[('agt_status', '=', 'active')]",
+        help="Série principal da AGT gerada e usada neste diário (ex: FT, FR, NC, ND...)."
     )
 
     l10n_ao_fe_refund_serie_id = fields.Many2one(

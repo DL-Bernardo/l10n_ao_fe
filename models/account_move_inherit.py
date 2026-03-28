@@ -68,6 +68,39 @@ class AccountMoveInherit(models.Model):
     # Campo técnico para identificação de facturas vindas do POS
     is_pos_invoice = fields.Boolean(string="É Factura POS", default=False, copy=False)
 
+    # Campos para coexistência com SAFT/Documentos Históricos
+    l10n_ao_fe_origin_type = fields.Selection([
+        ('fe', 'Factura Electrónica (Sistema)'),
+        ('legacy', 'Documento Histórico (SAFT)')
+    ], string="Tipo de Documento Origem", default='fe', copy=False)
+    
+    l10n_ao_fe_legacy_origin_number = fields.Char(string="Nº Documento Original", copy=False, help="Ex: FT 204 ou FT A1234")
+    l10n_ao_fe_legacy_origin_date = fields.Date(string="Data Doc. Original", copy=False)
+    l10n_ao_fe_legacy_reason = fields.Char(string="Motivo do Estorno/Retificação", copy=False)
+
+    @api.constrains('l10n_ao_fe_origin_type', 'l10n_ao_fe_legacy_origin_number', 'l10n_ao_fe_legacy_origin_date', 'l10n_ao_fe_legacy_reason', 'move_type')
+    def _check_legacy_origin_data(self):
+        for move in self:
+            if move.l10n_ao_fe_origin_type == 'legacy':
+                if not move.l10n_ao_fe_legacy_origin_number:
+                    raise UserError(_("Deve indicar o número do documento original histórico."))
+                if not move.l10n_ao_fe_legacy_origin_date:
+                    raise UserError(_("Deve indicar a data do documento original histórico."))
+                if not move.l10n_ao_fe_legacy_reason:
+                    raise UserError(_("Deve indicar o motivo do estorno para documentos históricos."))
+
+    def verificar_dados_fatura(self):
+        for invoice in self:
+            # Auto-preenche os campos obrigatórios do Odoo clássico se for histórico,
+            # para evitar o bypass de validação na camada subjacente opc_certification_ao_v17.
+            if invoice.l10n_ao_fe_origin_type == 'legacy' and invoice.move_type == 'out_refund':
+                if not invoice.invoice_origin and invoice.l10n_ao_fe_legacy_origin_number:
+                    invoice.invoice_origin = invoice.l10n_ao_fe_legacy_origin_number
+                if not invoice.reason_cancel and invoice.l10n_ao_fe_legacy_reason:
+                    invoice.reason_cancel = invoice.l10n_ao_fe_legacy_reason
+        return super(AccountMoveInherit, self).verificar_dados_fatura()
+
+
     @api.depends('journal_id', 'move_type')
     def _compute_l10n_ao_fe_serie_id(self):
         for move in self:

@@ -65,8 +65,29 @@
                 <attribute name="invisible">1</attribute>
             </xpath>
 
+            <!-- Adaptação para Notas de Crédito com Documento Histórico: Libertar a obrigatoriedade dos campos standard. -->
+            <xpath expr="//field[@name='invoice_origin_id']" position="attributes">
+                <attribute name="required">move_type == 'out_refund' and l10n_ao_fe_origin_type != 'legacy'</attribute>
+                <attribute name="invisible">move_type != 'out_refund' or l10n_ao_fe_origin_type == 'legacy'</attribute>
+            </xpath>
+            <xpath expr="//field[@name='reason_cancel']" position="attributes">
+                <attribute name="required">move_type == 'out_refund' and l10n_ao_fe_origin_type != 'legacy'</attribute>
+                <attribute name="invisible">move_type != 'out_refund' or l10n_ao_fe_origin_type == 'legacy'</attribute>
+            </xpath>
+
+
             <xpath expr="//notebook" position="inside">
                 <page string="Facturação Electrónica (AGT)" name="agt_fe">
+                    <group string="Referência a Documentos de Origem (Estornos e Notas de Débito)">
+                        <group>
+                            <field name="l10n_ao_fe_origin_type" widget="radio" options="{'horizontal': true}"/>
+                        </group>
+                        <group invisible="l10n_ao_fe_origin_type != 'legacy'">
+                            <field name="l10n_ao_fe_legacy_origin_number" required="l10n_ao_fe_origin_type == 'legacy'"/>
+                            <field name="l10n_ao_fe_legacy_origin_date" required="l10n_ao_fe_origin_type == 'legacy'"/>
+                            <field name="l10n_ao_fe_legacy_reason" required="l10n_ao_fe_origin_type == 'legacy'"/>
+                        </group>
+                    </group>
                     <group>
                         <group string="Identificadores">
                             <field name="l10n_ao_fe_serie_id" options="{'no_create': True}" readonly="state != 'draft'"/>

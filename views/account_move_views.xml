@@ -9,7 +9,7 @@
                         invisible="state != 'posted' or fe_status in ('validated', 'processing', 'sent')"/>
                 
                 <button name="action_download_fe" type="object" string="Baixar Factura Electrónica" class="btn-success" 
-                        invisible="fe_status != 'validated'"/>
+                        invisible="fe_status not in ('validated', 'cancelled')"/>
                 
                 <button name="open_payload_wizard" type="object" string="Payload JSON" class="btn-success"/>
                 
@@ -27,8 +27,8 @@
                         confirm="Tem a certeza que deseja validar manualmente? Use isto apenas se o documento já existir no portal da AGT."
                         invisible="fe_status != 'error'"/>
 
-                <button name="action_cancel_fe" type="object" string="Anular Factura" class="btn-danger"
-                        invisible="state != 'cancel'"/>
+                <button name="action_open_cancel_fe_wizard" type="object" string="Anular Factura (AGT)" class="btn-danger"
+                        invisible="fe_status != 'validated'"/>
             </header>
 
             <!-- Ocultar botões padrão do Odoo para limpar a interface -->
@@ -40,6 +40,11 @@
             </xpath>
             <xpath expr="//header//button[@name='button_cancel']" position="attributes">
                 <attribute name="invisible">1</attribute>
+            </xpath>
+            
+            <!-- Restringir o botão Cancelar do Odoo OPC ao fe_status permitido -->
+            <xpath expr="//header//button[@name='%(opc_certification_ao_v17.action_wizard_cancelar_fatura)d']" position="attributes">
+                <attribute name="invisible">state != 'posted' or fe_status not in ('error', 'not_sent')</attribute>
             </xpath>
             <xpath expr="//header//button[@name='button_request_cancel']" position="attributes">
                 <attribute name="invisible">1</attribute>

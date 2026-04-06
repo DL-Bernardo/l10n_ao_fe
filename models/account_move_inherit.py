@@ -365,11 +365,22 @@ class AccountMoveInherit(models.Model):
             }
         }
 
-    def action_cancel_fe(self):
-        """Anula a fatura na AGT (se suportado) e localmente."""
-        # Implementar lógica de anulação AGT se houver endpoint específico ou processo
-        self.write({'fe_status': 'cancelled'})
-        return self.button_cancel()
+    def action_open_cancel_fe_wizard(self):
+        """Abre wizard para escolher o motivo de anulação da factura na AGT e localmente."""
+        self.ensure_one()
+        if self.fe_status != 'validated':
+            raise UserError(_("Só pode anular na AGT facturas que já foram validadas. Se o estado é 'Enviado' ou 'Em Processamento', atualize o estado primeiro."))
+            
+        return {
+            'name': _('Anular Factura (AGT)'),
+            'type': 'ir.actions.act_window',
+            'res_model': 'l10n_ao.fe.cancel.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_move_id': self.id,
+            }
+        }
 
     # =====================================================
     # MÉTODO PARA GERAR O QR CODE (PADRÃO AGT)

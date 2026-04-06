@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_l10n_ao_fe_cancel_wizard_form" model="ir.ui.view">
+        <field name="name">l10n_ao.fe.cancel.wizard.form</field>
+        <field name="model">l10n_ao.fe.cancel.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Anular Factura na AGT">
+                <sheet>
+                    <group>
+                        <field name="move_id" readonly="1"/>
+                        <field name="cancel_reason" widget="radio"/>
+                    </group>
+                    <p class="text-muted">
+                        A anulação é irreversível e o documento manter-se-á na AGT com o estado <b>'A'</b>. Aconselha-se prudência.
+                    </p>
+                </sheet>
+                <footer>
+                    <button name="action_confirm_cancel" string="Confirmar Anulação" type="object" class="btn-danger"/>
+                    <button string="Cancelar" class="btn-secondary" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>

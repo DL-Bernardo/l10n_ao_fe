@@ -140,7 +140,7 @@ class FeService(models.AbstractModel):
         match = re.search(r'M\d{2}', tax.name or '')
         return match.group(0) if match else 'M10'
 
-    def registar_factura(self, move, preview=False):
+    def registar_factura(self, move, preview=False, cancel_reason=False):
         endpoint = "/registarFactura"
         url = self._get_base_url() + endpoint
         
@@ -326,10 +326,15 @@ class FeService(models.AbstractModel):
         # Lista de Retenções consolidada
         withholding_taxes = list(withholding_map.values())
 
+        # Estado de Fatura (Normal, Autofaturação, Anulado)
+        doc_status_code = "S" if move.move_type == 'in_invoice' else "N"
+        if cancel_reason:
+            doc_status_code = "A"
+
         doc_data = {
             "documentNo": document_no,
             "seriesCode": series_code,
-            "documentStatus": "S" if move.move_type == 'in_invoice' else "N", # S para Autofacturação
+            "documentStatus": doc_status_code,
             "documentDate": str(move.invoice_date),
             "documentType": doc_type,
             "systemEntryDate": timestamp,
@@ -339,6 +344,9 @@ class FeService(models.AbstractModel):
             "documentTotals": totals,
             "lines": lines
         }
+
+        if cancel_reason:
+            doc_data["documentCancelReason"] = cancel_reason
         
         # Secção Legal: Meios de Pagamento para FR (Factura/Recibo)
         if doc_type == 'FR':

@@ -9,3 +9,4 @@ from . import account_move_reversal_inherit
 from . import account_debit_note_inherit
 from . import fe_migration_wizard
 from . import fe_inventory_export
+from . import fe_cancel_wizard

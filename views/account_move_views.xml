@@ -3,7 +3,6 @@
         <field name="name">account.move.form.fe</field>
         <field name="model">account.move</field>
         <field name="inherit_id" ref="account.view_move_form"/>
-        <field name="priority">99</field>
         <field name="arch" type="xml">
             <header position="inside">
                 <button name="action_send_fe_agt" type="object" string="Reenviar FE a AGT" class="btn-warning" 

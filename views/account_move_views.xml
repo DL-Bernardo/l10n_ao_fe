@@ -39,14 +39,7 @@
             <xpath expr="//header//button[@name='preview_invoice']" position="attributes">
                 <attribute name="invisible">1</attribute>
             </xpath>
-            <xpath expr="//header//button[@name='button_cancel']" position="attributes">
-                <attribute name="invisible">1</attribute>
-            </xpath>
-            
-            <!-- Restringir o botão Cancelar do Odoo OPC ao fe_status permitido -->
-            <xpath expr="//header//button[@name='%(opc_certification_ao_v17.action_wizard_cancelar_fatura)d']" position="attributes">
-                <attribute name="invisible">state != 'posted' or fe_status not in ('error', 'not_sent')</attribute>
-            </xpath>
+
             <xpath expr="//header//button[@name='button_request_cancel']" position="attributes">
                 <attribute name="invisible">1</attribute>
             </xpath>
@@ -134,4 +127,17 @@
             </xpath>
         </field>
     </record>
+
+    <!-- Herança Direta da View do OPC para manipular com precisão o botão deles -->
+    <record id="view_move_form_fe_opc_override" model="ir.ui.view">
+        <field name="name">account.move.form.fe.opc.override</field>
+        <field name="model">account.move</field>
+        <field name="inherit_id" ref="opc_certification_ao_v17.invoice_form_inherit_certs_cancelar"/>
+        <field name="arch" type="xml">
+            <xpath expr="//button[@name='%(opc_certification_ao_v17.action_wizard_cancelar_fatura)d']" position="attributes">
+                <attribute name="invisible">state != 'posted' or fe_status not in ('error', 'not_sent')</attribute>
+            </xpath>
+        </field>
+    </record>
+
 </odoo>

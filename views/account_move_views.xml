@@ -42,8 +42,8 @@
                 <attribute name="invisible">1</attribute>
             </xpath>
             
-            <!-- Restringir o botão Cancelar do Odoo OPC ao fe_status permitido -->
-            <xpath expr="//header//button[@name='%(opc_certification_ao_v17.action_wizard_cancelar_fatura)d']" position="attributes">
+            <!-- Restringir o botão Cancelar nativo (Odoo Local) -->
+            <xpath expr="//header//button[@string='Cancelar' and @type='action']" position="attributes">
                 <attribute name="invisible">state != 'posted' or fe_status not in ('error', 'not_sent')</attribute>
             </xpath>
             <xpath expr="//header//button[@name='button_request_cancel']" position="attributes">

@@ -3,6 +3,7 @@
         <field name="name">account.move.form.fe</field>
         <field name="model">account.move</field>
         <field name="inherit_id" ref="account.view_move_form"/>
+        <field name="priority">99</field>
         <field name="arch" type="xml">
             <header position="inside">
                 <button name="action_send_fe_agt" type="object" string="Reenviar FE a AGT" class="btn-warning" 
@@ -42,8 +43,8 @@
                 <attribute name="invisible">1</attribute>
             </xpath>
             
-            <!-- Restringir o botão Cancelar nativo (Odoo Local) -->
-            <xpath expr="//header//button[@string='Cancelar' and @type='action']" position="attributes">
+            <!-- Restringir o botão Cancelar do Odoo OPC ao fe_status permitido -->
+            <xpath expr="//header//button[@name='%(opc_certification_ao_v17.action_wizard_cancelar_fatura)d']" position="attributes">
                 <attribute name="invisible">state != 'posted' or fe_status not in ('error', 'not_sent')</attribute>
             </xpath>
             <xpath expr="//header//button[@name='button_request_cancel']" position="attributes">

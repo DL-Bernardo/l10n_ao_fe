@@ -215,15 +215,27 @@ class FeService(models.AbstractModel):
                     "taxExemptionCode": "M10" # Padrão se nada for encontrado
                 })
 
-            # Cálculo para evitar Erro E21 (Matemática da Linha)
-            # AGT 1.2: creditAmount/debitAmount = unitPrice * quantity
-            # unitPrice DEVE SER o preço unitário LÍQUIDO (já com descontos aplicados)
-            # unitPriceBase DEVE SER o preço unitário BRUTO (original)
-            unit_price_bruto = float(line.price_unit)
+            # Cálculo de Preços e Descontos à Prova de "Imposto Incluído"
+            # Em Odoo, se o imposto for incluído no preço, 'line.price_unit' mantém o valor Bruto, 
+            # o que causava o envio incorreto de falsos "Descontos".
+            # 'line.price_subtotal' é SEMPRE o líquido final exato da linha.
             qty = float(line.quantity) or 1.0
             subtotal_liquido = float(line.price_subtotal)
-            unit_price_net = self._round_tax(subtotal_liquido / qty)
-            desconto_total_kz = self._round_tax((unit_price_bruto * qty) - subtotal_liquido)
+            discount_pct = float(line.discount) if line.discount else 0.0
+            
+            if discount_pct > 0 and discount_pct < 100:
+                base_liquida_total = subtotal_liquido / (1.0 - (discount_pct / 100.0))
+                desconto_total_kz = self._round_tax(base_liquida_total - subtotal_liquido)
+            elif discount_pct == 100:
+                # Prevenir divisão por zero
+                base_liquida_total = float(line.price_unit) * qty
+                desconto_total_kz = base_liquida_total
+            else:
+                base_liquida_total = subtotal_liquido
+                desconto_total_kz = 0.0
+                
+            unit_price_sem_desconto = self._round_tax(base_liquida_total / qty)
+            unit_price_com_desconto = self._round_tax(subtotal_liquido / qty)
 
             line_data = {
                 "lineNumber": int(i),
@@ -231,12 +243,12 @@ class FeService(models.AbstractModel):
                 "productDescription": line.name[:200],
                 "quantity": qty,
                 "unitOfMeasure": line.product_uom_id.name or "Un",
-                "unitPrice": unit_price_net, # Preço Unitário Líquido
-                "unitPriceBase": unit_price_bruto, # Preço Unitário Bruto
+                "unitPrice": unit_price_com_desconto,    # AGT: Preço líquido após desconto, sem impostos
+                "unitPriceBase": unit_price_sem_desconto, # AGT: Preço líquido antes de desconto, sem impostos
                 "debitAmount": subtotal_liquido if move.move_type in ('out_refund', 'in_invoice') else 0.0,
                 "creditAmount": subtotal_liquido if move.move_type in ('out_invoice', 'in_refund') else 0.0,
                 "taxes": line_taxes,
-                "settlementAmount": desconto_total_kz if desconto_total_kz > 0 else 0.0
+                "settlementAmount": desconto_total_kz
             }
             
             # Referência para NC e ND

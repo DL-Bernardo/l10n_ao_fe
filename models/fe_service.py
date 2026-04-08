@@ -167,12 +167,25 @@ class FeService(models.AbstractModel):
             line_taxes = []
             tax_base = line.price_subtotal
             
-            for tax in line.tax_ids:
+            # Recorrer ao motor central do Odoo para garantir precisão exata do que foi impresso no PDF
+            # Isto é especialmente crítico quando o imposto está "Incluído no Preço"
+            taxes_res = line.tax_ids.compute_all(
+                line.price_unit,
+                currency=line.currency_id,
+                quantity=line.quantity,
+                product=line.product_id,
+                partner=move.partner_id,
+                is_refund=move.move_type in ('out_refund', 'in_refund'),
+            )
+            
+            for tax_vals in taxes_res['taxes']:
+                tax = line.env['account.tax'].browse(tax_vals['id'])
                 agt_tax_type = self._get_agt_tax_type(tax)
-                # Apenas IVA e IS vão para a linha conforme spec AGT
+                
                 if agt_tax_type in ('IVA', 'IS'):
                     tax_percentage = abs(tax.amount)
-                    tax_amount = self._round_tax((tax_base * tax_percentage) / 100)
+                    # Extrair o valor real que o Odoo calculou para esta fatura
+                    tax_amount = abs(tax_vals['amount'])
                     
                     # Para IVA usamos NOR/ISE/etc. Para IS, o taxCode é diferente
                     tax_code = 'NOR' if agt_tax_type == 'IVA' else '' # IS não usa NOR

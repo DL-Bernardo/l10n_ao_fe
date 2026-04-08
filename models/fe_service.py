@@ -184,8 +184,8 @@ class FeService(models.AbstractModel):
                 
                 if agt_tax_type in ('IVA', 'IS'):
                     tax_percentage = abs(tax.amount)
-                    # Extrair o valor real que o Odoo calculou para esta fatura
-                    tax_amount = abs(tax_vals['amount'])
+                    # Extrair o valor real que o Odoo calculou para esta fatura e arredondar a 2 casas
+                    tax_amount = self._round_tax(abs(tax_vals['amount']))
                     
                     # Para IVA usamos NOR/ISE/etc. Para IS, o taxCode é diferente
                     tax_code = 'NOR' if agt_tax_type == 'IVA' else '' # IS não usa NOR

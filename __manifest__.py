@@ -9,7 +9,7 @@ Compatível com o ambiente de homologação 2025.
     """,
     'author': 'Digitalub / ContasMais',
     'license': 'AGPL-3',
-    'depends': ['base', 'account', 'stock', 'account_debit_note', 'point_of_sale', 'opc_certification_ao_v17'],
+    'depends': ['base', 'account', 'sale', 'stock', 'account_debit_note', 'point_of_sale', 'opc_certification_ao_v17'],
 
     'data': [
         'security/ir.model.access.csv',
